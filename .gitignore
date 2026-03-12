@@ -1,0 +1,6 @@
+# Deno
+.deno/
+
+# OS
+.DS_Store
+Thumbs.db
