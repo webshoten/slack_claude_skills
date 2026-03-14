@@ -49,6 +49,7 @@ app.post("/webhook/slack", verify, async (c) => {
     await handleMention(
       messenger,
       store,
+      vault,
       event.channel,
       event.user,
       event.text,
