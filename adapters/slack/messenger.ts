@@ -18,8 +18,8 @@ export class SlackMessenger implements Messenger {
   }
 
   // APIキーを設定するボタンを表示
-  async promptApiKeySetup(channel: string, user: string): Promise<void> {
-    await this.slackApi("chat.postEphemeral", {
+  async promptApiKeySetup(channel: string, user: string, threadTs?: string): Promise<void> {
+    const payload: Record<string, unknown> = {
       channel,
       user,
       text: "Claude APIキーを設定してください",
@@ -35,7 +35,9 @@ export class SlackMessenger implements Messenger {
           ],
         },
       ],
-    });
+    };
+    if (threadTs) payload.thread_ts = threadTs;
+    await this.slackApi("chat.postEphemeral", payload);
   }
 
   // APIキーを設定するフォームを開く

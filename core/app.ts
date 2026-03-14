@@ -19,7 +19,7 @@ export async function handleMention(
   const command = parseCommand(text);
 
   if (command === "set-key") {
-    await messenger.promptApiKeySetup(channel, user);
+    await messenger.promptApiKeySetup(channel, user, ts);
     return;
   }
 
@@ -46,7 +46,7 @@ export async function handleMention(
 
   // APIキー未登録なら設定を促す
   if (!apiKey) {
-    await messenger.promptApiKeySetup(channel, user);
+    await messenger.promptApiKeySetup(channel, user, ts);
     return;
   }
 

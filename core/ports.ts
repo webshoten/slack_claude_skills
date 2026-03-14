@@ -4,7 +4,7 @@ export interface Messenger {
   // 本人だけに見えるメッセージ
   replyEphemeral(channel: string, user: string, text: string): Promise<void>;
   // APIキー入力を促すUI表示
-  promptApiKeySetup(channel: string, user: string): Promise<void>;
+  promptApiKeySetup(channel: string, user: string, threadTs?: string): Promise<void>;
   // APIキー入力フォームを開く
   openApiKeyForm(triggerId: string, channel: string): Promise<void>;
 }
