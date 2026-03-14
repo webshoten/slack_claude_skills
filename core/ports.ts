@@ -20,6 +20,11 @@ export interface KvBrowser {
   delete(key: string[]): Promise<void>;
 }
 
+// Port: LLM（バリデーション・チャット）
+export interface Llm {
+  validate(apiKey: string): Promise<boolean>;
+}
+
 // Port: APIキーの保管（暗号化は adapter の責務）
 export interface KeyVault {
   get(userId: string): Promise<string | null>;

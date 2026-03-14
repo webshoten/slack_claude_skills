@@ -14,10 +14,12 @@ import {
 } from "./core/app.ts";
 import { createAdmin } from "./adapters/kv/admin.ts";
 import { DenoKvBrowser } from "./adapters/kv/browser.ts";
+import { ClaudeLlm } from "./adapters/llm/claude.ts";
 
 const messenger = new SlackMessenger(Deno.env.get("SLACK_BOT_TOKEN") ?? "");
 const store = new DenoKvMessageStore();
 const vault = await DenoKvVault.create(Deno.env.get("ENCRYPTION_KEY") ?? "");
+const llm = new ClaudeLlm();
 const app = new Hono<SlackEnv>();
 
 const browser = new DenoKvBrowser();
@@ -80,6 +82,7 @@ app.post("/webhook/slack/interaction", verify, async (c) => {
   if (interaction.kind === "apikey_submission") {
     await handleApiKeySave(
       vault,
+      llm,
       messenger,
       interaction.user,
       interaction.channel,
