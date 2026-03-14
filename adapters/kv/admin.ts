@@ -1,64 +1,54 @@
 import { Hono } from "hono";
+import type { KvBrowser } from "../../core/ports.ts";
 
-const admin = new Hono();
-
-// Basic認証
-admin.use("*", async (c, next) => {
-  const password = Deno.env.get("ADMIN_PASSWORD");
-  if (!password) {
-    return c.text("ADMIN_PASSWORD not configured", 500);
-  }
+export function createAdmin(browser: KvBrowser) {
+  const admin = new Hono();
 
   // Basic認証
-  const auth = c.req.header("Authorization");
-  if (!auth?.startsWith("Basic ")) {
-    c.header("WWW-Authenticate", 'Basic realm="admin"');
-    return c.text("Unauthorized", 401);
-  }
+  admin.use("*", async (c, next) => {
+    const password = Deno.env.get("ADMIN_PASSWORD");
+    if (!password) {
+      return c.text("ADMIN_PASSWORD not configured", 500);
+    }
 
-  // Basic認証のユーザー名とパスワードを取得
-  const decoded = atob(auth.slice(6));
-  const [user, pass] = decoded.split(":");
-  if (user !== "admin" || pass !== password) {
-    c.header("WWW-Authenticate", 'Basic realm="admin"');
-    return c.text("Unauthorized", 401);
-  }
+    const auth = c.req.header("Authorization");
+    if (!auth?.startsWith("Basic ")) {
+      c.header("WWW-Authenticate", 'Basic realm="admin"');
+      return c.text("Unauthorized", 401);
+    }
 
-  await next();
-});
+    // Basic認証のユーザー名とパスワードを取得
+    const decoded = atob(auth.slice(6));
+    const [user, pass] = decoded.split(":");
+    if (user !== "admin" || pass !== password) {
+      c.header("WWW-Authenticate", 'Basic realm="admin"');
+      return c.text("Unauthorized", 401);
+    }
 
-// 削除
-admin.post("/kv/delete", async (c) => {
-  const body = await c.req.parseBody();
-  const rawKey = body["key"] as string;
-  if (!rawKey) return c.text("key required", 400);
+    await next();
+  });
 
-  const key = JSON.parse(rawKey) as string[];
-  const kv = await Deno.openKv();
-  await kv.delete(key);
-  kv.close();
+  // 削除
+  admin.post("/kv/delete", async (c) => {
+    const body = await c.req.parseBody();
+    const rawKey = body["key"] as string;
+    if (!rawKey) return c.text("key required", 400);
 
-  return c.redirect("/admin/kv");
-});
+    const key = JSON.parse(rawKey) as string[];
+    await browser.delete(key);
 
-// 一覧表示
-admin.get("/kv", async (c) => {
-  const kv = await Deno.openKv();
-  const entries: { key: string[]; value: unknown }[] = [];
+    return c.redirect("/admin/kv");
+  });
 
-  for await (const entry of kv.list({ prefix: [] })) {
-    entries.push({
-      key: entry.key as string[],
-      value: entry.value,
-    });
-  }
-  kv.close();
+  // 一覧表示
+  admin.get("/kv", async (c) => {
+    const entries = await browser.list();
 
-  const rows = entries
-    .map((e) => {
-      const keyJson = JSON.stringify(e.key);
-      const displayValue = maskSensitive(e.key, e.value);
-      return `<tr>
+    const rows = entries
+      .map((e) => {
+        const keyJson = JSON.stringify(e.key);
+        const displayValue = maskSensitive(e.key, e.value);
+        return `<tr>
         <td><code>${escapeHtml(keyJson)}</code></td>
         <td><pre>${escapeHtml(JSON.stringify(displayValue, null, 2))}</pre></td>
         <td>
@@ -68,10 +58,10 @@ admin.get("/kv", async (c) => {
           </form>
         </td>
       </tr>`;
-    })
-    .join("\n");
+      })
+      .join("\n");
 
-  const html = `<!DOCTYPE html>
+    const html = `<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -97,8 +87,11 @@ admin.get("/kv", async (c) => {
 </body>
 </html>`;
 
-  return c.html(html);
-});
+    return c.html(html);
+  });
+
+  return admin;
+}
 
 /** APIキーなど機密値をマスクする */
 function maskSensitive(key: string[], value: unknown): unknown {
@@ -119,5 +112,3 @@ function escapeHtml(s: string): string {
 function escapeAttr(s: string): string {
   return escapeHtml(s);
 }
-
-export { admin };

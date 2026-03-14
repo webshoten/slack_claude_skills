@@ -7,3 +7,9 @@ export interface Messenger {
 export interface MessageStore {
   save(channel: string, user: string, text: string, ts: string): Promise<void>;
 }
+
+// Port: KVの横断的な閲覧・削除（管理用）
+export interface KvBrowser {
+  list(): Promise<{ key: string[]; value: unknown }[]>;
+  delete(key: string[]): Promise<void>;
+}
