@@ -40,7 +40,7 @@ export async function handleMention(
       "• use スキル名 — スキル実行",
       "• list — スキル一覧",
     ].join("\n");
-    await messenger.reply(channel, help);
+    await messenger.reply(channel, help, ts);
     return;
   }
 

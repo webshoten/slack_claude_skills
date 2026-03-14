@@ -1,6 +1,6 @@
 // Port: メッセージの送信先を抽象化
 export interface Messenger {
-  reply(channel: string, text: string): Promise<void>;
+  reply(channel: string, text: string, threadTs?: string): Promise<void>;
   // 本人だけに見えるメッセージ
   replyEphemeral(channel: string, user: string, text: string): Promise<void>;
   // APIキー入力を促すUI表示

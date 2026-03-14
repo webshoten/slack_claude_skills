@@ -3,8 +3,10 @@ import type { Messenger } from "../../core/ports.ts";
 export class SlackMessenger implements Messenger {
   constructor(private token: string) {}
 
-  async reply(channel: string, text: string): Promise<void> {
-    await this.slackApi("chat.postMessage", { channel, text });
+  async reply(channel: string, text: string, threadTs?: string): Promise<void> {
+    const payload: Record<string, unknown> = { channel, text };
+    if (threadTs) payload.thread_ts = threadTs;
+    await this.slackApi("chat.postMessage", payload);
   }
 
   async replyEphemeral(
