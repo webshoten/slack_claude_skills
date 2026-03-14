@@ -22,7 +22,7 @@ export class SlackMessenger implements Messenger {
     const payload: Record<string, unknown> = {
       channel,
       user,
-      text: "Claude APIキーを設定してください",
+      text: "Claude APIキーを設定してください（Anthropic の API キーが必要です）",
       blocks: [
         {
           type: "actions",

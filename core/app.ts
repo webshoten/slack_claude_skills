@@ -35,7 +35,7 @@ export async function handleMention(
       `APIキー: ${keyStatus}`,
       "",
       "コマンド:",
-      "• set-key — APIキー登録",
+      "• set-key — Claude APIキー登録",
       "• train スキル名 — スキル育成",
       "• use スキル名 — スキル実行",
       "• list — スキル一覧",
