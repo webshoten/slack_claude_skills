@@ -8,6 +8,7 @@ app.get("/", (c) => {
 
 app.post("/webhook/slack", async (c) => {
   const body = await c.req.json();
+  console.log("POST /webhook/slack body:", JSON.stringify(body));
 
   // Slack URL verification challenge
   if (body.type === "url_verification") {
