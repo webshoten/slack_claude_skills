@@ -17,7 +17,7 @@ import { DenoKvBrowser } from "./adapters/kv/browser.ts";
 
 const messenger = new SlackMessenger(Deno.env.get("SLACK_BOT_TOKEN") ?? "");
 const store = new DenoKvMessageStore();
-const vault = new DenoKvVault();
+const vault = await DenoKvVault.create(Deno.env.get("ENCRYPTION_KEY") ?? "");
 const app = new Hono<SlackEnv>();
 
 const browser = new DenoKvBrowser();
