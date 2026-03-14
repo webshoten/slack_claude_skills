@@ -50,9 +50,10 @@ export function slackVerifyMiddleware(signingSecret: string) {
       return c.json({ error: "invalid signature" }, 401);
     }
 
-    // c.req.text() で body を消費済みのため、パース結果を c.set() で
-    // 後続ハンドラに渡す。こうしないと body を再度読み取れない。
-    c.set("slackBody", JSON.parse(body));
+    // c.req.text() で body を消費済みのため、raw body を c.set() で
+    // 後続ハンドラに渡す。JSON / form-encoded どちらにも対応できるよう
+    // パースは各ハンドラの責務とする。
+    c.set("slackRawBody", body);
     await next();
   };
 }
