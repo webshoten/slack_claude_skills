@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { SlackMessenger, parseSlackEvent } from "./adapters/slack.ts";
+import { SlackMessenger } from "./adapters/slack/messenger.ts";
+import { parseSlackEvent } from "./adapters/slack/event.ts";
 import { handleMention } from "./core/app.ts";
 
 const messenger = new SlackMessenger(Deno.env.get("SLACK_BOT_TOKEN") ?? "");

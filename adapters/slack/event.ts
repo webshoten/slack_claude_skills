@@ -1,5 +1,3 @@
-import type { Messenger } from "../core/ports.ts";
-
 export type SlackEvent =
   | { kind: "challenge"; challenge: string }
   | { kind: "mention"; channel: string; text: string }
@@ -16,19 +14,4 @@ export function parseSlackEvent(body: Record<string, unknown>): SlackEvent {
     }
   }
   return { kind: "unknown" };
-}
-
-export class SlackMessenger implements Messenger {
-  constructor(private token: string) {}
-
-  async reply(channel: string, text: string): Promise<void> {
-    await fetch("https://slack.com/api/chat.postMessage", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${this.token}`,
-      },
-      body: JSON.stringify({ channel, text }),
-    });
-  }
 }
