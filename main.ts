@@ -1,9 +1,11 @@
 import { Hono } from "hono";
 import { SlackMessenger } from "./adapters/slack/messenger.ts";
 import { parseSlackEvent } from "./adapters/slack/event.ts";
+import { DenoKvMessageStore } from "./adapters/kv/message-store.ts";
 import { handleMention } from "./core/app.ts";
 
 const messenger = new SlackMessenger(Deno.env.get("SLACK_BOT_TOKEN") ?? "");
+const store = new DenoKvMessageStore();
 const app = new Hono();
 
 app.get("/", (c) => {
@@ -20,7 +22,14 @@ app.post("/webhook/slack", async (c) => {
     return c.json({ challenge: event.challenge });
   }
   if (event.kind === "mention") {
-    await handleMention(messenger, event.channel, event.text);
+    await handleMention(
+      messenger,
+      store,
+      event.channel,
+      event.user,
+      event.text,
+      event.ts,
+    );
   }
 
   return c.json({ ok: true });

@@ -1,6 +1,6 @@
 export type SlackEvent =
   | { kind: "challenge"; challenge: string }
-  | { kind: "mention"; channel: string; text: string }
+  | { kind: "mention"; channel: string; text: string; user: string; ts: string }
   | { kind: "unknown" };
 
 export function parseSlackEvent(body: Record<string, unknown>): SlackEvent {
@@ -10,7 +10,7 @@ export function parseSlackEvent(body: Record<string, unknown>): SlackEvent {
   if (body.type === "event_callback") {
     const event = body.event as Record<string, string>;
     if (event.type === "app_mention") {
-      return { kind: "mention", channel: event.channel, text: event.text };
+      return { kind: "mention", channel: event.channel, text: event.text, user: event.user, ts: event.ts };
     }
   }
   return { kind: "unknown" };
