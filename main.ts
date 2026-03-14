@@ -6,10 +6,13 @@ import { parseSlackEvent } from "./adapters/slack/event.ts";
 import { slackVerifyMiddleware } from "./adapters/slack/verify.ts";
 import { DenoKvMessageStore } from "./adapters/kv/message-store.ts";
 import { handleMention } from "./core/app.ts";
+import { admin } from "./adapters/kv/admin.ts";
 
 const messenger = new SlackMessenger(Deno.env.get("SLACK_BOT_TOKEN") ?? "");
 const store = new DenoKvMessageStore();
 const app = new Hono<SlackEnv>();
+
+app.route("/admin", admin);
 
 app.get("/", (c) => {
   return c.json({ message: "Hello Skill Bot!" });
