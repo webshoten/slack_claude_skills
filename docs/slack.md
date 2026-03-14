@@ -26,7 +26,19 @@
 2. 権限を許可
 3. **Bot User OAuth Token**（`xoxb-...`）をコピーして控える
 
-## 5. Event Subscriptions
+## 5. Signing Secret（リクエスト署名検証）
+
+Webhook が Slack からのリクエストであることを検証するために使用する。
+
+1. 左メニュー「Basic Information」→「App Credentials」セクション
+2. **Signing Secret** をコピー
+3. Deno Deploy の環境変数に設定:
+   - Name: `SLACK_SIGNING_SECRET`
+   - Value: コピーした Signing Secret
+
+※ これがないと、誰でも `/webhook/slack` に POST できてしまう
+
+## 6. Event Subscriptions
 
 ※ サーバーがデプロイ済みであること（challenge レスポンスが必要）
 
@@ -37,7 +49,7 @@
 5. `app_mention` を検索して追加
 6. ページ下部の「Save Changes」を押す
 
-## 6. 動作確認
+## 7. 動作確認
 
 1. Slack でボットをチャンネルに招待: `/invite @SkillBot`
 2. `@SkillBot こんにちは` とメンション
