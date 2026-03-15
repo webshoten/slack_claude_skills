@@ -36,7 +36,8 @@
   - 育成用システムプロンプト（`buildTrainSystemPrompt`）
 
 ### Slack 側の設定状況
-- Event Subscriptions: `app_mention` + `message.channels` 設定済み
+- Event Subscriptions: `app_mention` + `message.channels` + `message.groups`（プライベートチャンネル用）設定済み
+- Bot Token Scopes: `app_mentions:read`, `chat:write`, `channels:history`, `groups:history`
 - Interactivity: `/webhook/slack/interaction` 設定済み
 - 環境変数: `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`, `ADMIN_PASSWORD`, `ENCRYPTION_KEY`
 
