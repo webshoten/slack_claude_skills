@@ -1,4 +1,4 @@
-import type { Messenger } from "../../core/ports.ts";
+import type { Messenger, ThreadMessage } from "../../core/ports.ts";
 
 export class SlackMessenger implements Messenger {
   constructor(private token: string) {}
@@ -85,6 +85,19 @@ export class SlackMessenger implements Messenger {
     await this.slackApi("chat.update", { channel, ts, text, blocks: [] });
   }
 
+  async getThreadReplies(channel: string, threadTs: string): Promise<ThreadMessage[]> {
+    const data = await this.slackApiJson("conversations.replies", {
+      channel,
+      ts: threadTs,
+    });
+    // deno-lint-ignore no-explicit-any
+    return (data.messages ?? []).map((m: any) => ({
+      text: m.text ?? "",
+      ts: m.ts,
+      botId: m.bot_id ?? undefined,
+    }));
+  }
+
   private async slackApi(
     method: string,
     body: Record<string, unknown>,
@@ -97,5 +110,18 @@ export class SlackMessenger implements Messenger {
       },
       body: JSON.stringify(body),
     });
+  }
+
+  // deno-lint-ignore no-explicit-any
+  private async slackApiJson(method: string, body: Record<string, unknown>): Promise<any> {
+    const res = await fetch(`https://slack.com/api/${method}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${this.token}`,
+      },
+      body: JSON.stringify(body),
+    });
+    return await res.json();
   }
 }

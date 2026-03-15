@@ -171,6 +171,17 @@ export function createApp(ports: Ports) {
       text: string,
       threadTs: string,
     ): Promise<void> {
+      // use セッションを優先チェック
+      const useSession = await useSessionStore.get(threadTs);
+      if (useSession) {
+        await use.handleUseMessage(
+          messenger, skillStore, useSessionStore, keyVault, llm,
+          channel, user, text, threadTs,
+        );
+        return;
+      }
+
+      // train セッション
       await train.handleThreadMessage(
         messenger, skillStore, sessionStore, keyVault, pendingStore, llm,
         channel, user, text, threadTs,

@@ -16,7 +16,16 @@ export interface Messenger {
   ): Promise<void>;
   // 既存メッセージを更新（ボタン差し替え等）
   updateMessage(channel: string, ts: string, text: string): Promise<void>;
+  // スレッドの返信一覧を取得
+  getThreadReplies(channel: string, threadTs: string): Promise<ThreadMessage[]>;
 }
+
+// スレッド内のメッセージ
+export type ThreadMessage = {
+  text: string;
+  ts: string;
+  botId?: string;
+};
 
 // Port: メッセージの保存先を抽象化
 export interface MessageStore {
