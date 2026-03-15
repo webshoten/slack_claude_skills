@@ -3,6 +3,7 @@ import type {
   Llm,
   MessageStore,
   Messenger,
+  PendingStore,
   SessionStore,
   SkillStore,
 } from "./ports.ts";
@@ -15,6 +16,7 @@ export type Ports = {
   keyVault: KeyVault;
   skillStore: SkillStore;
   sessionStore: SessionStore;
+  pendingStore: PendingStore;
   llm: Llm;
 };
 
@@ -24,8 +26,10 @@ function parseCommand(text: string): string {
 }
 
 export function createApp(ports: Ports) {
-  const { messenger, messageStore, keyVault, skillStore, sessionStore, llm } =
-    ports;
+  const {
+    messenger, messageStore, keyVault, skillStore, sessionStore, pendingStore,
+    llm,
+  } = ports;
 
   return {
     async handleMention(
@@ -114,6 +118,18 @@ export function createApp(ports: Ports) {
 
       // TODO: use, list の実装
       await messenger.reply(channel, `受け取りました: ${text}`);
+    },
+
+    async handleThreadMessage(
+      channel: string,
+      user: string,
+      text: string,
+      threadTs: string,
+    ): Promise<void> {
+      await train.handleThreadMessage(
+        messenger, skillStore, sessionStore, keyVault, pendingStore, llm,
+        channel, user, text, threadTs,
+      );
     },
 
     async handleApiKeyButton(

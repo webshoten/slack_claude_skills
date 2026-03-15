@@ -9,6 +9,7 @@ import { DenoKvMessageStore } from "./adapters/kv/message-store.ts";
 import { DenoKvVault } from "./adapters/kv/vault.ts";
 import { DenoKvSkillStore } from "./adapters/kv/skill-store.ts";
 import { DenoKvSessionStore } from "./adapters/kv/session-store.ts";
+import { DenoKvPendingStore } from "./adapters/kv/pending-store.ts";
 import { createAdmin } from "./adapters/kv/admin.ts";
 import { DenoKvBrowser } from "./adapters/kv/browser.ts";
 import { ClaudeLlm } from "./adapters/llm/claude.ts";
@@ -20,6 +21,7 @@ const skillBot = createApp({
   keyVault: await DenoKvVault.create(Deno.env.get("ENCRYPTION_KEY") ?? ""),
   skillStore: new DenoKvSkillStore(),
   sessionStore: new DenoKvSessionStore(),
+  pendingStore: new DenoKvPendingStore(),
   llm: new ClaudeLlm(),
 });
 
@@ -47,12 +49,23 @@ server.post("/webhook/slack", verify, async (c) => {
     return c.json({ challenge: event.challenge });
   }
 
+  // スレッド内の@SkillBotメンションかどうか
   if (event.kind === "mention") {
     await skillBot.handleMention(
       event.channel,
       event.user,
       event.text,
       event.ts,
+      event.threadTs,
+    );
+  }
+
+  // スレッド内のメッセージかどうか
+  if (event.kind === "thread_message") {
+    await skillBot.handleThreadMessage(
+      event.channel,
+      event.user,
+      event.text,
       event.threadTs,
     );
   }

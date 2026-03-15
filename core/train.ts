@@ -1,4 +1,11 @@
-import type { Messenger, SessionStore, SkillStore } from "./ports.ts";
+import type {
+  KeyVault,
+  Llm,
+  Messenger,
+  PendingStore,
+  SessionStore,
+  SkillStore,
+} from "./ports.ts";
 
 /** スキルの状態に応じたガイドメッセージを生成 */
 function buildTrainGuide(
@@ -113,4 +120,123 @@ export async function handleTrainInThread(
     );
     await sessionStore.start(threadTs, skillName);
   }
+}
+
+/** 育成用システムプロンプトを生成 */
+function buildTrainSystemPrompt(
+  skillName: string,
+  existing: string | null,
+): string {
+  return `あなたはスキル育成アシスタントです。
+ユーザーの入力に基づいて SKILL.md を更新してください。
+
+## 現在の SKILL.md
+${existing ?? `---\nname: ${skillName}\ndescription: \n---\n`}
+
+## SKILL.md の形式
+- YAML frontmatter（name, description）+ マークダウン本文
+- セクション構成は自由。内容に応じて適切に構成する
+- 簡潔に、要点のみ記述する
+
+## あなたの役割
+- ユーザーの入力を解釈し、SKILL.md への変更を提案する
+- 追加・編集・削除を自然言語から判断する
+- 既存の内容と重複しないようにする
+- ユーザーの意図が曖昧な場合は、最も自然な解釈で提案する
+
+## 出力形式
+以下の2つをJSON形式で返してください:
+1. "diff": 変更の説明（ユーザーに見せる差分表示）
+2. "updated": 変更適用後の SKILL.md 全体（frontmatter 含む）
+
+説明や前置きは不要。JSONのみ出力。`;
+}
+
+/** OK/NGボタンの blocks を生成 */
+function buildConfirmBlocks(diff: string): unknown[] {
+  return [
+    {
+      type: "section",
+      text: { type: "mrkdwn", text: diff },
+    },
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: "OK" },
+          style: "primary",
+          action_id: "train_ok",
+        },
+        {
+          type: "button",
+          text: { type: "plain_text", text: "NG" },
+          style: "danger",
+          action_id: "train_ng",
+        },
+      ],
+    },
+  ];
+}
+
+export async function handleThreadMessage(
+  messenger: Messenger,
+  skillStore: SkillStore,
+  sessionStore: SessionStore,
+  keyVault: KeyVault,
+  pendingStore: PendingStore,
+  llm: Llm,
+  channel: string,
+  user: string,
+  text: string,
+  threadTs: string,
+): Promise<void> {
+  const skillName = await sessionStore.get(threadTs);
+  if (!skillName) return;
+
+  const apiKey = await keyVault.get(user);
+  if (!apiKey) {
+    await messenger.promptApiKeySetup(channel, user, threadTs);
+    return;
+  }
+
+  const existing = await skillStore.get(skillName);
+  const systemPrompt = buildTrainSystemPrompt(skillName, existing);
+
+  let response: string;
+  try {
+    response = await llm.chat(
+      apiKey,
+      [{ role: "user", content: text }],
+      systemPrompt,
+    );
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    await messenger.replyInThread(
+      channel,
+      threadTs,
+      `エラーが発生しました: ${message}`,
+    );
+    return;
+  }
+
+  let parsed: { diff: string; updated: string };
+  try {
+    parsed = JSON.parse(response);
+  } catch {
+    await messenger.replyInThread(
+      channel,
+      threadTs,
+      `応答の解析に失敗しました。もう一度お試しください。`,
+    );
+    return;
+  }
+
+  await pendingStore.save(threadTs, parsed.updated);
+  await messenger.replyInThread(
+    channel,
+    threadTs,
+    parsed.diff,
+    buildConfirmBlocks(parsed.diff),
+  );
 }

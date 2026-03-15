@@ -27,41 +27,32 @@
   - `handleTrainStart` — ユーザーのメッセージにスレッド返信 + セッション開始
   - `handleTrainInThread` — 同じスキル→育成中表示 / 別スキル→切り替え / セッションなし→新規開始
   - `handleTrainStatus` — スレッド内で `train`（スキル名なし）→ 現在の育成状況表示
+- **育成モード Step 2: スレッド返信 → Claude 差分提案**
+  - Llm port に `chat` 追加 + ClaudeLlm に実装（Haiku、ユーザーのAPIキーで呼び出し）
+  - `parseSlackEvent` に `thread_message` 追加（`bot_id` なし + `thread_ts` あり）
+  - Messenger に `replyInThread` 追加（blocks 付きスレッド返信）
+  - PendingStore port + DenoKvPendingStore adapter（`["pending", threadTs]`）
+  - `handleThreadMessage` — セッション確認 → Claude API → diff + OK/NG ボタン表示 → pending 保存
+  - 育成用システムプロンプト（`buildTrainSystemPrompt`）
 
 ### Slack 側の設定状況
-- Event Subscriptions: `app_mention` 設定済み。`message.channels` は Step 2 で必要
+- Event Subscriptions: `app_mention` + `message.channels` 設定済み
 - Interactivity: `/webhook/slack/interaction` 設定済み
 - 環境変数: `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`, `ADMIN_PASSWORD`, `ENCRYPTION_KEY`
 
 ---
 
-## 次回: 育成モード Step 2 — スレッド返信 → Claude 差分提案
+## 次回: 育成モード Step 3 — OK/NG → 保存 or スキップ
 
-1. **`Llm` port に `chat` 追加 + `ClaudeLlm` に実装**
-   - ユーザーの APIキーで Claude API を呼ぶ
+1. **`parseSlackInteraction` に `train_confirm` 追加**
+   - `action_id: "train_ok"` → approved: true
+   - `action_id: "train_ng"` → approved: false
 
-2. **`parseSlackEvent` に `thread_message` 追加**
-   - `thread_ts` あり + `bot_id` なし → ユーザーからのスレッド返信
+2. **Core: `handleTrainConfirm`**（core/train.ts に追加）
+   - OK → `pendingStore.get(threadTs)` → `skillStore.save()` → 「反映しました」
+   - NG → `pendingStore.delete(threadTs)` → 「スキップしました」
 
-3. **`Messenger` に `replyInThread` 追加**
-   - OK/NG ボタン付きのスレッド返信
-
-4. **`PendingStore`（一時データ保存）**
-   - OK 待ちの更新後 SKILL.md を `["pending", threadTs]` に保存
-
-5. **Core: `handleThreadMessage`**（core/train.ts に追加）
-   - セッション確認 → APIキー取得 → Claude API → diff + OK/NG ボタン表示
-
-6. **`main.ts` にワイヤリング**
-
-7. **Slack 側**: Event Subscriptions に `message.channels` 追加が必要
-
----
-
-## 育成モード Step 3（その次）: OK/NG → 保存 or スキップ
-
-- `parseSlackInteraction` に `train_confirm` 追加
-- Core: `handleTrainConfirm`
+3. **`main.ts` にワイヤリング**
 
 ---
 

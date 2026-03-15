@@ -172,7 +172,7 @@ interface SessionStore {
 
 KV キー: `["sessions", threadTs]` → スキル名
 
-### Llm（chat 未実装）
+### Llm（実装済み）
 
 ```typescript
 interface Llm {
@@ -183,7 +183,7 @@ interface Llm {
 
 `chat` を追加。ユーザーの APIキーで Claude API を呼ぶ。
 
-### Messenger（replyInThread 未実装）
+### Messenger（実装済み）
 
 ```typescript
 // 既存
@@ -202,7 +202,7 @@ replyInThread(channel: string, threadTs: string, text: string, blocks?: unknown[
 
 `threadTs` を含むように拡張済み。スレッド内からのメンションかどうかを判定できる。
 
-### thread_message（未実装）
+### thread_message（実装済み）
 
 `message.channels` イベントでスレッド内の返信を受信する。
 `parseSlackEvent` に追加:
@@ -259,7 +259,7 @@ train コマンド受信
   → セッションなし → 「スキル名を指定してください」
 ```
 
-### handleThreadMessage（未実装）
+### handleThreadMessage（実装済み）
 
 ```
 スレッド内メッセージ受信（メンションなし）
@@ -335,13 +335,13 @@ OK/NG ボタン押下
 - createApp パターンへのリファクタ
 - 責務分離（core/train.ts, core/apikey.ts）
 
-### Step 2: スレッド返信 → Claude 差分提案（次）
+### Step 2: スレッド返信 → Claude 差分提案（完了）
 - Llm port に chat 追加 + ClaudeLlm に実装
 - parseSlackEvent に thread_message 追加
 - Messenger に replyInThread 追加
-- PendingStore（一時データ保存）
+- PendingStore port + DenoKvPendingStore adapter
 - Core: handleThreadMessage
-- Slack 側: Event Subscriptions に message.channels 追加
+- Slack 側: Event Subscriptions に message.channels 設定済み
 
 ### Step 3: OK/NG → 保存 or スキップ
 - parseSlackInteraction に train_confirm 追加

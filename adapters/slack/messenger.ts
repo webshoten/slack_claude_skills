@@ -66,6 +66,21 @@ export class SlackMessenger implements Messenger {
     });
   }
 
+  async replyInThread(
+    channel: string,
+    threadTs: string,
+    text: string,
+    blocks?: unknown[],
+  ): Promise<void> {
+    const payload: Record<string, unknown> = {
+      channel,
+      thread_ts: threadTs,
+      text,
+    };
+    if (blocks) payload.blocks = blocks;
+    await this.slackApi("chat.postMessage", payload);
+  }
+
   private async slackApi(
     method: string,
     body: Record<string, unknown>,

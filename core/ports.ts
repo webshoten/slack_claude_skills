@@ -7,6 +7,13 @@ export interface Messenger {
   promptApiKeySetup(channel: string, user: string, threadTs?: string): Promise<void>;
   // APIキー入力フォームを開く
   openApiKeyForm(triggerId: string, channel: string): Promise<void>;
+  // スレッド内にブロック付き返信
+  replyInThread(
+    channel: string,
+    threadTs: string,
+    text: string,
+    blocks?: unknown[],
+  ): Promise<void>;
 }
 
 // Port: メッセージの保存先を抽象化
@@ -21,8 +28,15 @@ export interface KvBrowser {
 }
 
 // Port: LLM（バリデーション・チャット）
+export type LlmMessage = { role: "user" | "assistant"; content: string };
+
 export interface Llm {
   validate(apiKey: string): Promise<boolean>;
+  chat(
+    apiKey: string,
+    messages: LlmMessage[],
+    systemPrompt: string,
+  ): Promise<string>;
 }
 
 // Port: APIキーの保管（暗号化は adapter の責務）
@@ -45,4 +59,11 @@ export interface SessionStore {
   start(threadTs: string, skillName: string): Promise<void>;
   get(threadTs: string): Promise<string | null>;
   end(threadTs: string): Promise<void>;
+}
+
+// Port: OK待ちの一時データ保存
+export interface PendingStore {
+  save(threadTs: string, content: string): Promise<void>;
+  get(threadTs: string): Promise<string | null>;
+  delete(threadTs: string): Promise<void>;
 }
