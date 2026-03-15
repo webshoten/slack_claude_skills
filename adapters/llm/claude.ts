@@ -117,8 +117,8 @@ export class ClaudeLlm implements Llm {
 
       // HTMLタグを除去してテキストだけ返す（トークン節約）
       const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-      // 長すぎる場合は切り詰め
-      return text.length > 20000 ? text.slice(0, 20000) + "...（省略）" : text;
+      // 長すぎる場合は切り詰め（レートリミット対策）
+      return text.length > 5000 ? text.slice(0, 5000) + "...（省略）" : text;
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       return `取得エラー: ${message}`;
