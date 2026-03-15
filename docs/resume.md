@@ -52,8 +52,12 @@
   - train/use セッションを KV キーで分離（`train_sessions` / `use_sessions`）
   - `conversations.replies` でスレッド履歴取得、`startTs` 以降のみ使用
   - `Llm.chat` に `model` / `tools` パラメータ追加（train は Haiku、use は Sonnet）
-  - `web_fetch` ツール対応（Claude が tool use でウェブページ取得可能、最大5回ループ）
+  - `web_fetch` ツール対応（Claude が tool use でウェブページ取得可能、最大10回ループ）
+  - Google bot ブロック時の DuckDuckGo 自動フォールバック
+  - 取得テキスト 5,000文字切り詰め（レートリミット対策）
+  - プロンプトでクロールの最小限実行を指示
 - **list コマンド** — `@SkillBot list` でスキル一覧表示
+- **`docs/summary.md`** — 全体サマリー（アーキテクチャ・コマンド・KV構造等）
 
 ### Slack 側の設定状況
 - Event Subscriptions: `app_mention` + `message.channels` + `message.groups`（プライベートチャンネル用）設定済み
@@ -63,8 +67,20 @@
 
 ---
 
+## 次回やること
+
+### use モード Step 4: スレッド内モード切り替え（`docs/use.md` 参照）
+- `handleUseInThread` — 同じスキル（すでにモード）/ 別のスキル（上書き）/ train からの切り替え
+- train コマンド実行時に use_sessions を消す処理を train.ts に追加
+- use → train → use の交互切り替えが正しく動くことを確認
+
+### アーキテクチャ改善の検討
+- `ClaudeLlm.chat` に `web_fetch` の実行まで入っており責務が混在
+- ツール実行を別の port（例: `ToolExecutor`）に分離する案あり
+
+---
+
 ## 未着手だが設計済み
 - テスト戦略（`docs/testing.md`）— ユニットテスト + リグレッションチェックリスト + CI/CD
-- use モードの Step 4: スレッド内モード切り替え（`docs/use.md` 参照）
 - Canvas 対応（SkillStore の adapter 差し替え）
 - 画像対応（Post-MVP）

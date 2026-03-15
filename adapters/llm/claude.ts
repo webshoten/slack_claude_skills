@@ -65,23 +65,25 @@ export class ClaudeLlm implements Llm {
 
       // tool_use がなければテキストを返して終了
       // deno-lint-ignore no-explicit-any
-      const toolUseBlock = data.content.find((b: any) => b.type === "tool_use");
-      if (!toolUseBlock) {
+      const toolUseBlocks = data.content.filter((b: any) => b.type === "tool_use");
+      if (toolUseBlocks.length === 0) {
         // deno-lint-ignore no-explicit-any
         const textBlock = data.content.find((b: any) => b.type === "text");
         return textBlock?.text ?? "";
       }
 
-      // tool_use を処理
-      const toolResult = await this.executeTool(toolUseBlock.name, toolUseBlock.input);
-      console.log(`Tool call: ${toolUseBlock.name}(${JSON.stringify(toolUseBlock.input).slice(0, 200)}) → ${toolResult.slice(0, 200)}`);
+      // すべての tool_use を処理
+      // deno-lint-ignore no-explicit-any
+      const toolResults: any[] = [];
+      for (const toolUseBlock of toolUseBlocks) {
+        const toolResult = await this.executeTool(toolUseBlock.name, toolUseBlock.input);
+        console.log(`Tool call: ${toolUseBlock.name}(${JSON.stringify(toolUseBlock.input).slice(0, 200)}) → ${toolResult.slice(0, 200)}`);
+        toolResults.push({ type: "tool_result", tool_use_id: toolUseBlock.id, content: toolResult });
+      }
 
       // assistant の応答と tool_result を会話に追加して再ループ
       apiMessages.push({ role: "assistant", content: data.content });
-      apiMessages.push({
-        role: "user",
-        content: [{ type: "tool_result", tool_use_id: toolUseBlock.id, content: toolResult }],
-      });
+      apiMessages.push({ role: "user", content: toolResults });
     }
 
     throw new Error("ツール呼び出しの上限に達しました");
