@@ -72,8 +72,8 @@ export function createApp(ports: Ports) {
       }
 
       // train コマンド
-      if (command.startsWith("train ")) {
-        const skillName = command.slice("train ".length).trim();
+      if (command === "train" || command.startsWith("train ")) {
+        const skillName = command.slice("train".length).trim();
         if (!skillName) {
           await messenger.reply(
             channel,
