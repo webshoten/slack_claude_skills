@@ -22,7 +22,7 @@ export type Ports = {
 
 /** メンションのテキストからBot名部分を除去してコマンドを取り出す */
 function parseCommand(text: string): string {
-  return text.replace(/<@[A-Z0-9]+>/g, "").trim();
+  return text.replace(/<@[A-Z0-9]+>/g, "").replace(/\u3000/g, " ").trim();
 }
 
 export function createApp(ports: Ports) {
