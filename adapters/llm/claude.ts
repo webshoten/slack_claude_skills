@@ -61,6 +61,7 @@ export class ClaudeLlm implements Llm {
       }
 
       const data = await res.json();
+      console.log(`Tool loop ${i + 1}: stop_reason=${data.stop_reason}, content types=${data.content.map((b: any) => b.type).join(",")}`);
 
       // tool_use がなければテキストを返して終了
       // deno-lint-ignore no-explicit-any
@@ -73,6 +74,7 @@ export class ClaudeLlm implements Llm {
 
       // tool_use を処理
       const toolResult = await this.executeTool(toolUseBlock.name, toolUseBlock.input);
+      console.log(`Tool call: ${toolUseBlock.name}(${JSON.stringify(toolUseBlock.input).slice(0, 200)}) → ${toolResult.slice(0, 200)}`);
 
       // assistant の応答と tool_result を会話に追加して再ループ
       apiMessages.push({ role: "assistant", content: data.content });
