@@ -7,21 +7,20 @@ import type {
   SkillStore,
 } from "./ports.ts";
 
-/** スキルの状態に応じたガイドメッセージを生成 */
+/** 育成ガイドメッセージを生成 */
 function buildTrainGuide(
   skillName: string,
   existing: string | null,
-  action: "start" | "resume" | "switch",
+  switched?: boolean,
 ): string {
-  const header = action === "switch"
-    ? `*${skillName}* に切り替えました${existing ? "。" : "（新規作成）。"}`
-    : action === "resume"
-    ? `*${skillName}* の育成を再開します。`
-    : `*${skillName}* を新規作成します。`;
+  const header = switched
+    ? `*${skillName}* に切り替えました。`
+    : `*${skillName}* の育成セッションを開始します。`;
+
+  const lines = [header];
 
   if (existing) {
-    return [
-      header,
+    lines.push(
       "",
       "現在のスキル:",
       "---",
@@ -29,16 +28,16 @@ function buildTrainGuide(
       "---",
       "",
       "追加・編集・削除したい内容を送ってください。",
-    ].join("\n");
+    );
+  } else {
+    lines.push(
+      "",
+      "このスキルに覚えさせたいことを自由に送ってください。",
+      "1つずつ送信してください。内容を整形して確認します。",
+    );
   }
 
-  return [
-    header,
-    "",
-    "このスキルに覚えさせたいことを自由に送ってください。",
-    "知識、ルール、手順、応答例など、なんでもOKです。",
-    "1つずつ送信してください。内容を整形して確認します。",
-  ].join("\n");
+  return lines.join("\n");
 }
 
 export async function handleTrainStatus(
@@ -72,10 +71,9 @@ export async function handleTrainStart(
   ts: string,
 ): Promise<void> {
   const existing = await skillStore.get(skillName);
-  const action = existing ? "resume" : "start";
   await messenger.reply(
     channel,
-    buildTrainGuide(skillName, existing, action),
+    buildTrainGuide(skillName, existing),
     ts,
   );
   await sessionStore.start(ts, skillName);
@@ -106,16 +104,15 @@ export async function handleTrainInThread(
     const existing = await skillStore.get(skillName);
     await messenger.reply(
       channel,
-      buildTrainGuide(skillName, existing, "switch"),
+      buildTrainGuide(skillName, existing, true),
       threadTs,
     );
   } else {
     // セッションがないスレッドで train → 新規セッション開始
     const existing = await skillStore.get(skillName);
-    const action = existing ? "resume" : "start";
     await messenger.reply(
       channel,
-      buildTrainGuide(skillName, existing, action),
+      buildTrainGuide(skillName, existing),
       threadTs,
     );
     await sessionStore.start(threadTs, skillName);
@@ -142,14 +139,16 @@ ${existing ?? `---\nname: ${skillName}\ndescription: \n---\n`}
 - ユーザーの入力を解釈し、SKILL.md への変更を提案する
 - 追加・編集・削除を自然言語から判断する
 - 既存の内容と重複しないようにする
-- ユーザーの意図が曖昧な場合は、最も自然な解釈で提案する
+- ユーザーの意図が曖昧な場合は、確認の質問をする
 
 ## 出力形式
-以下の2つをJSON形式で返してください:
-1. "diff": 変更の説明（ユーザーに見せる差分表示）
-2. "updated": 変更適用後の SKILL.md 全体（frontmatter 含む）
+JSON形式で出力。説明や前置きは不要。
 
-説明や前置きは不要。JSONのみ出力。`;
+入力が明確な場合（変更を提案）:
+{"type":"proposal","diff":"変更の説明","updated":"変更適用後の SKILL.md 全体（frontmatter 含む）"}
+
+入力が曖昧・不明確な場合（質問して明確にする）:
+{"type":"question","message":"質問内容"}`;
 }
 
 /** OK/NGボタンの blocks を生成 */
@@ -220,7 +219,7 @@ export async function handleThreadMessage(
     return;
   }
 
-  let parsed: { diff: string; updated: string };
+  let parsed: { type: string; diff?: string; updated?: string; message?: string };
   try {
     parsed = JSON.parse(response);
   } catch {
@@ -232,11 +231,25 @@ export async function handleThreadMessage(
     return;
   }
 
-  await pendingStore.save(threadTs, parsed.updated);
+  if (parsed.type === "question" && parsed.message) {
+    await messenger.replyInThread(channel, threadTs, parsed.message);
+    return;
+  }
+
+  if (parsed.type === "proposal" && parsed.diff && parsed.updated) {
+    await pendingStore.save(threadTs, parsed.updated);
+    await messenger.replyInThread(
+      channel,
+      threadTs,
+      parsed.diff,
+      buildConfirmBlocks(parsed.diff),
+    );
+    return;
+  }
+
   await messenger.replyInThread(
     channel,
     threadTs,
-    parsed.diff,
-    buildConfirmBlocks(parsed.diff),
+    `応答の解析に失敗しました。もう一度お試しください。`,
   );
 }

@@ -292,7 +292,7 @@ OK/NG ボタン押下
 ユーザーの入力に基づいて SKILL.md を更新してください。
 
 ## 現在の SKILL.md
-{既存の内容。新規の場合は空}
+{既存の内容。新規の場合は空テンプレート}
 
 ## SKILL.md の形式
 - YAML frontmatter（name, description）+ マークダウン本文
@@ -303,15 +303,24 @@ OK/NG ボタン押下
 - ユーザーの入力を解釈し、SKILL.md への変更を提案する
 - 追加・編集・削除を自然言語から判断する
 - 既存の内容と重複しないようにする
-- ユーザーの意図が曖昧な場合は、最も自然な解釈で提案する
+- ユーザーの意図が曖昧な場合は、確認の質問をする
 
 ## 出力形式
-以下の2つをJSON形式で返してください:
-1. "diff": 変更の説明（ユーザーに見せる差分表示）
-2. "updated": 変更適用後の SKILL.md 全体（frontmatter 含む）
+JSON形式で出力。説明や前置きは不要。
 
-説明や前置きは不要。JSONのみ出力。
+入力が明確な場合（変更を提案）:
+{"type":"proposal","diff":"変更の説明","updated":"変更適用後の SKILL.md 全体（frontmatter 含む）"}
+
+入力が曖昧・不明確な場合（質問して明確にする）:
+{"type":"question","message":"質問内容"}
 ```
+
+### handleThreadMessage のレスポンス分岐
+
+| `type` | 動作 |
+|--------|------|
+| `proposal` | diff + OK/NG ボタン表示、updated を pending に保存 |
+| `question` | テキスト返信のみ（ボタンなし）。ユーザーの回答は再度 `thread_message` として届く |
 
 ---
 
@@ -341,6 +350,7 @@ OK/NG ボタン押下
 - Messenger に replyInThread 追加
 - PendingStore port + DenoKvPendingStore adapter
 - Core: handleThreadMessage
+- Claude レスポンスの分岐: proposal（提案 + OK/NG）/ question（質問のみ）
 - Slack 側: Event Subscriptions に message.channels 設定済み
 
 ### Step 3: OK/NG → 保存 or スキップ
