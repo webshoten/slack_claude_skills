@@ -32,8 +32,8 @@ export class ClaudeLlm implements Llm {
       content: m.content,
     }));
 
-    // tool use のループ（最大5回まで）
-    for (let i = 0; i < 5; i++) {
+    // tool use のループ（最大10回まで）
+    for (let i = 0; i < 10; i++) {
       // deno-lint-ignore no-explicit-any
       const body: any = {
         model: model ?? "claude-haiku-4-5-20251001",
@@ -104,6 +104,17 @@ export class ClaudeLlm implements Llm {
         return `HTTP ${res.status}: ${url} の取得に失敗しました`;
       }
       const html = await res.text();
+
+      // Google 検索が bot ブロックされた場合、DuckDuckGo にフォールバック
+      if (url.includes("google.com/search") && html.includes("Please click here if you are not redirected")) {
+        const googleUrl = new URL(url);
+        const query = googleUrl.searchParams.get("q") ?? "";
+        if (query) {
+          console.log(`Google blocked, falling back to DuckDuckGo: ${query}`);
+          return await this.webFetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`);
+        }
+      }
+
       // HTMLタグを除去してテキストだけ返す（トークン節約）
       const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
       // 長すぎる場合は切り詰め

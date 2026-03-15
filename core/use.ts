@@ -54,9 +54,10 @@ function buildUseSystemPrompt(skillContent: string): string {
 
 ## ツールの使い方
 web_fetch ツールでウェブページを取得できます。
-- 検索したい場合: https://www.google.com/search?q=キーワード を取得して検索結果を得る
+- 検索したい場合: https://www.google.com/search?q=キーワード を取得して検索結果を得る（ブロックされた場合は自動で DuckDuckGo にフォールバックされます）
 - 特定サイトを見たい場合: URLを直接指定して取得する
 - 複数ページをクロールしたい場合: 取得結果からリンクを拾って順に取得する
+- URLが404の場合は推測でリトライせず、まず検索で正しいURLを見つけること
 
 ## スキル
 ${skillContent}`;
