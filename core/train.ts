@@ -93,8 +93,8 @@ export async function handleTrainInThread(
     return;
   }
 
-  // 別のスキルに切り替え
   if (currentSkill) {
+    // 別のスキルに切り替え
     await sessionStore.start(threadTs, skillName);
     const existing = await skillStore.get(skillName);
     await messenger.reply(
@@ -102,5 +102,15 @@ export async function handleTrainInThread(
       buildTrainGuide(skillName, existing, "switch"),
       threadTs,
     );
+  } else {
+    // セッションがないスレッドで train → 新規セッション開始
+    const existing = await skillStore.get(skillName);
+    const action = existing ? "resume" : "start";
+    await messenger.reply(
+      channel,
+      buildTrainGuide(skillName, existing, action),
+      threadTs,
+    );
+    await sessionStore.start(threadTs, skillName);
   }
 }
