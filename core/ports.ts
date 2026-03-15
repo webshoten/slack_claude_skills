@@ -47,6 +47,7 @@ export interface Llm {
     apiKey: string,
     messages: LlmMessage[],
     systemPrompt: string,
+    model?: string,
   ): Promise<string>;
 }
 

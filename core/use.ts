@@ -90,7 +90,7 @@ export async function handleUseMessage(
 
   let response: string;
   try {
-    response = await llm.chat(apiKey, messages, systemPrompt);
+    response = await llm.chat(apiKey, messages, systemPrompt, "claude-sonnet-4-6");
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     await messenger.replyInThread(channel, threadTs, `エラーが発生しました: ${message}`);
