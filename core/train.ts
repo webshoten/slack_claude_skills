@@ -118,7 +118,7 @@ export async function handleTrainInThread(
   if (currentSkill === skillName) {
     await messenger.reply(
       channel,
-      `すでに *${skillName}* を育成中です。`,
+      `*${skillName}* の育成モードに切り替えました。`,
       threadTs,
     );
     return;
