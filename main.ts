@@ -98,6 +98,15 @@ server.post("/webhook/slack/interaction", verify, async (c) => {
     return c.json({ ok: true });
   }
 
+  if (interaction.kind === "train_confirm") {
+    await skillBot.handleTrainConfirm(
+      interaction.channel,
+      interaction.threadTs,
+      interaction.approved,
+    );
+    return c.json({ ok: true });
+  }
+
   if (interaction.kind === "apikey_submission") {
     await skillBot.handleApiKeySave(
       interaction.user,

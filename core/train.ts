@@ -258,3 +258,32 @@ export async function handleThreadMessage(
     `応答の解析に失敗しました。もう一度お試しください。`,
   );
 }
+
+export async function handleTrainConfirm(
+  messenger: Messenger,
+  skillStore: SkillStore,
+  sessionStore: SessionStore,
+  pendingStore: PendingStore,
+  channel: string,
+  threadTs: string,
+  approved: boolean,
+): Promise<void> {
+  if (approved) {
+    const updated = await pendingStore.get(threadTs);
+    if (!updated) {
+      await messenger.replyInThread(channel, threadTs, "保存対象が見つかりませんでした。");
+      return;
+    }
+    const skillName = await sessionStore.get(threadTs);
+    if (!skillName) {
+      await messenger.replyInThread(channel, threadTs, "セッションが見つかりませんでした。");
+      return;
+    }
+    await skillStore.save(skillName, updated);
+    await pendingStore.delete(threadTs);
+    await messenger.replyInThread(channel, threadTs, "反映しました。");
+  } else {
+    await pendingStore.delete(threadTs);
+    await messenger.replyInThread(channel, threadTs, "スキップしました。別の内容をどうぞ。");
+  }
+}

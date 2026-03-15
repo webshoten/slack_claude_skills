@@ -132,6 +132,17 @@ export function createApp(ports: Ports) {
       );
     },
 
+    async handleTrainConfirm(
+      channel: string,
+      threadTs: string,
+      approved: boolean,
+    ): Promise<void> {
+      await train.handleTrainConfirm(
+        messenger, skillStore, sessionStore, pendingStore,
+        channel, threadTs, approved,
+      );
+    },
+
     async handleApiKeyButton(
       triggerId: string,
       channel: string,
