@@ -95,14 +95,15 @@ export class ClaudeLlm implements Llm {
       apiMessages.push({ role: "user", content: toolResults });
     }
 
-    // ツール呼び出し上限に達した場合、最後のレスポンスからテキストを返す
-    const lastAssistant = apiMessages.findLast((m: any) => m.role === "assistant");
-    if (lastAssistant?.content) {
-      const textBlock = Array.isArray(lastAssistant.content)
-        ? lastAssistant.content.find((b: any) => b.type === "text")
-        : null;
-      if (textBlock?.text) return textBlock.text;
+    // ツール呼び出し上限に達した場合、ループ中のすべてのテキストを結合して返す
+    const texts: string[] = [];
+    for (const msg of apiMessages) {
+      if (msg.role !== "assistant" || !Array.isArray(msg.content)) continue;
+      for (const block of msg.content) {
+        if (block.type === "text" && block.text) texts.push(block.text);
+      }
     }
+    if (texts.length > 0) return texts.join("\n\n");
     return "すみません、情報の取得に時間がかかりすぎたため、回答を完了できませんでした。質問を変えて再度お試しください。";
   }
 
