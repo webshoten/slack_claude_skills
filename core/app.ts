@@ -116,6 +116,21 @@ export function createApp(ports: Ports) {
         return;
       }
 
+      // show コマンド
+      if (command === "show" || command.startsWith("show ")) {
+        const skillName = command.slice("show".length).trim();
+        if (skillName) {
+          // チャンネルまたはスレッドでスキル名を指定
+          await train.handleShowSkill(messenger, skillStore, channel, skillName, threadTs ?? ts);
+        } else if (threadTs) {
+          // スレッド内でスキル名省略 → セッションのスキルを表示
+          await train.handleShowSkill(messenger, skillStore, channel, null, threadTs, sessionStore);
+        } else {
+          await messenger.reply(channel, "スキル名を指定してください。例: `show react-expert`", ts);
+        }
+        return;
+      }
+
       // TODO: use, list の実装
       await messenger.reply(channel, `受け取りました: ${text}`);
     },

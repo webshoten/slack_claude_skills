@@ -40,6 +40,32 @@ function buildTrainGuide(
   return lines.join("\n");
 }
 
+export async function handleShowSkill(
+  messenger: Messenger,
+  skillStore: SkillStore,
+  channel: string,
+  skillName: string | null,
+  threadTs: string,
+  sessionStore?: SessionStore,
+): Promise<void> {
+  // スキル名が省略された場合、セッションから取得
+  let name = skillName;
+  if (!name && sessionStore) {
+    name = await sessionStore.get(threadTs);
+  }
+  if (!name) {
+    await messenger.reply(channel, "スキル名を指定してください。例: `show react-expert`", threadTs);
+    return;
+  }
+
+  const content = await skillStore.get(name);
+  if (content) {
+    await messenger.reply(channel, `*${name}* の現在のスキル:\n---\n${content}\n---`, threadTs);
+  } else {
+    await messenger.reply(channel, `*${name}* はまだ作成されていません。`, threadTs);
+  }
+}
+
 export async function handleTrainStatus(
   messenger: Messenger,
   sessionStore: SessionStore,
