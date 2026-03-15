@@ -12,17 +12,17 @@ export class DenoKvSessionStore implements SessionStore {
 
   async start(threadTs: string, skillName: string): Promise<void> {
     const kv = await this.getKv();
-    await kv.set(["sessions", threadTs], skillName);
+    await kv.set(["train_sessions", threadTs], skillName);
   }
 
   async get(threadTs: string): Promise<string | null> {
     const kv = await this.getKv();
-    const entry = await kv.get(["sessions", threadTs]);
+    const entry = await kv.get(["train_sessions", threadTs]);
     return (entry.value as string) ?? null;
   }
 
   async end(threadTs: string): Promise<void> {
     const kv = await this.getKv();
-    await kv.delete(["sessions", threadTs]);
+    await kv.delete(["train_sessions", threadTs]);
   }
 }

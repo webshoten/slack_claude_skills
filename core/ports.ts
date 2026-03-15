@@ -56,10 +56,19 @@ export interface SkillStore {
   delete(name: string): Promise<void>;
 }
 
-// Port: 育成セッションの管理
+// Port: 育成（train）セッションの管理
 export interface SessionStore {
   start(threadTs: string, skillName: string): Promise<void>;
   get(threadTs: string): Promise<string | null>;
+  end(threadTs: string): Promise<void>;
+}
+
+// Port: 実行（use）セッションの管理
+export type UseSession = { skillName: string; startTs: string };
+
+export interface UseSessionStore {
+  start(threadTs: string, session: UseSession): Promise<void>;
+  get(threadTs: string): Promise<UseSession | null>;
   end(threadTs: string): Promise<void>;
 }
 
