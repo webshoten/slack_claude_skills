@@ -16,7 +16,7 @@
 2. Bot: スキルの存在確認 → スレッド返信「react-expert モードで会話を開始します」
 3. Bot: use_sessions に記録（threadTs → { skillName, startTs }）
 4. ユーザー:（スレッド内で）このコンポーネントのリファクタ方針を教えて
-5. Bot: SKILL.md をシステムプロンプト + startTs 以降の会話履歴で Claude API に送信 → 回答
+5. Bot: SKILL.md をシステムプロンプト + startTs 以降の会話履歴で Claude API（Sonnet）に送信 → 回答
 6. 4〜5 を繰り返す
 ```
 
@@ -39,7 +39,7 @@
 | `use スキル名` | スキル存在確認 → セッション開始 |
 | `use`（スキル名なし）+ スレッド内 use セッションあり | セッションのスキルで継続（なければエラー） |
 | `use`（スキル名なし）+ チャンネル | 「スキル名を指定してください」 |
-| スキルが存在しない | 「スキル名 はまだ作成されていません」 |
+| スキルが存在しない | 「スキル名 はまだ作成されていません」+ 利用可能なスキル一覧を表示 |
 
 ### スレッド内での use コマンド
 
@@ -62,10 +62,12 @@
 | | train | use |
 |---|---|---|
 | 目的 | SKILL.md を編集する | SKILL.md を使って会話する |
+| Claude モデル | Haiku | Sonnet |
 | Claude の役割 | 育成アシスタント（diff 提案） | スキルに基づく回答者 |
 | OK/NG ボタン | あり | なし |
 | pending 保存 | あり | なし |
 | 会話履歴 | 不要（1ターンずつ独立） | 必要（startTs 以降の文脈を維持） |
+| ツール（tool use） | なし | web_fetch（ウェブページ取得） |
 
 ---
 
@@ -121,70 +123,69 @@ conversations.replies で全メッセージ取得
 
 ---
 
+## モデルとツール
+
+### 使用モデル
+
+- train: `claude-haiku-4-5-20251001`（JSON 整形が主なので軽量モデルで十分）
+- use: `claude-sonnet-4-6`（スキルに基づく高品質な回答が必要）
+
+### tool use: web_fetch
+
+use モードでは Claude に `web_fetch` ツールを与える。Claude がウェブページの取得が必要と判断したら自動的に使う。
+
+```
+ユーザー: 名古屋市で8万円の賃貸を探して
+  → Claude が web_fetch で Google 検索URLを取得
+  → サーバーが fetch → HTMLをテキスト化して Claude に返す
+  → Claude が結果からリンクを見つけて再度 web_fetch
+  → 最終回答をスレッドに投稿
+```
+
+- 最大5回までツール呼び出し可能（ループ上限）
+- HTMLタグは除去してテキストのみ返す（トークン節約）
+- 20,000文字を超える場合は切り詰め
+- 検索したい場合は Claude が Google の検索URLを自分で組み立てて使う
+
+### Llm インターフェースの拡張
+
+```typescript
+type LlmTool = { name: string; description: string; input_schema: any };
+
+interface Llm {
+  validate(apiKey: string): Promise<boolean>;
+  chat(
+    apiKey: string,
+    messages: LlmMessage[],
+    systemPrompt: string,
+    model?: string,
+    tools?: LlmTool[],
+  ): Promise<string>;
+}
+```
+
+- `model` と `tools` はオプション。省略すれば従来通り（Haiku、ツールなし）
+- tool use のループ処理は `ClaudeLlm` 内で完結（呼び出し元は意識しない）
+
+---
+
 ## システムプロンプト（use 用）
 
 ```
-あなたは以下のスキルに基づいて応答するアシスタントです。
-スキルに記載されたルール・知識・方針に従って回答してください。
+以下のスキルに基づいて応答してください。
+スキルに記載されたルール・知識・方針に従い、ユーザーの質問や依頼に対応してください。
+あなたは Claude です。Claude としての能力はすべて使えます。
+返答は Slack のスレッドに投稿されるため、簡潔にしてください。
+
+## ツールの使い方
+web_fetch ツールでウェブページを取得できます。
+- 検索したい場合: https://www.google.com/search?q=キーワード を取得して検索結果を得る
+- 特定サイトを見たい場合: URLを直接指定して取得する
+- 複数ページをクロールしたい場合: 取得結果からリンクを拾って順に取得する
 
 ## スキル
 {SKILL.md の内容}
 ```
-
----
-
-## 必要な変更
-
-### core/ports.ts
-- `SessionStore` はインターフェース変更なし（train 用のまま）
-- `UseSessionStore` インターフェースを新規追加
-- `Messenger` に `getThreadReplies` 追加
-
-```typescript
-// train 用（既存のまま）
-interface SessionStore {
-  start(threadTs: string, skillName: string): Promise<void>;
-  get(threadTs: string): Promise<string | null>;
-  end(threadTs: string): Promise<void>;
-}
-
-// use 用（新規）
-type UseSession = { skillName: string; startTs: string };
-
-interface UseSessionStore {
-  start(threadTs: string, session: UseSession): Promise<void>;
-  get(threadTs: string): Promise<UseSession | null>;
-  end(threadTs: string): Promise<void>;
-}
-
-// Messenger に追加
-type ThreadMessage = { user: string; text: string; ts: string; botId?: string };
-
-interface Messenger {
-  // 既存メソッド省略
-  getThreadReplies(channel: string, threadTs: string): Promise<ThreadMessage[]>;
-}
-```
-
-### adapters/kv/session-store.ts
-- KV キーを `["sessions", ...]` → `["train_sessions", ...]` にリネーム
-- 後方互換: 旧キーからの移行は不要（デプロイ時にセッションはリセットされて問題ない）
-
-### adapters/kv/use-session-store.ts（新規）
-- `DenoKvUseSessionStore` — `["use_sessions", threadTs]` に UseSession を保存
-
-### adapters/slack/messenger.ts
-- `getThreadReplies(channel, threadTs)` — `conversations.replies` を呼び出し
-- 現在の `slackApi` は `void` を返すので、レスポンスを返す版（`slackApiJson` 等）を追加
-
-### core/use.ts（新規）
-- `handleUseStart` — スキル存在確認 → use セッション開始 → 開始メッセージ
-- `handleUseInThread` — スレッド内での use コマンド（切り替え等）
-- `handleUseMessage` — スレッド内メッセージ → 会話履歴取得 → Claude API → 回答
-
-### core/app.ts
-- `handleMention` に `use` コマンドのルーティング追加
-- `handleThreadMessage` で use_sessions → train_sessions の順にチェックして分岐
 
 ---
 
@@ -194,31 +195,70 @@ interface Messenger {
 
 use セッション中に `show` を実行しても問題なし。show は独立した処理（スキル内容を表示するだけ）で、セッション状態に影響しない。
 
-### list コマンド（未実装）
+### list コマンド（実装済み）
 
-use とは独立。スキル一覧を表示するだけ。
+use とは独立。`@SkillBot list` でスキル一覧を表示。
+スキルが存在しない場合の use コマンドでも一覧を表示する。
+
+---
+
+## 必要な変更
+
+### core/ports.ts（実装済み）
+- `UseSession` 型 + `UseSessionStore` インターフェース追加
+- `ThreadMessage` 型 + `Messenger.getThreadReplies` 追加
+- `LlmTool` 型追加、`Llm.chat` に `model?` と `tools?` パラメータ追加
+
+### adapters/kv/session-store.ts（実装済み）
+- KV キーを `["sessions", ...]` → `["train_sessions", ...]` にリネーム
+
+### adapters/kv/use-session-store.ts（実装済み・新規）
+- `DenoKvUseSessionStore` — `["use_sessions", threadTs]` に UseSession を保存
+
+### adapters/slack/messenger.ts（実装済み）
+- `getThreadReplies(channel, threadTs)` — `conversations.replies` を呼び出し
+- `slackApiJson` — レスポンスを返す版の Slack API 呼び出し
+
+### adapters/llm/claude.ts（実装済み）
+- `chat` に `model` と `tools` パラメータ追加
+- tool use のループ処理（最大5回）
+- `web_fetch` ツール実行（fetch → HTMLテキスト化 → 切り詰め）
+
+### core/use.ts（実装済み・新規）
+- `handleUseStart` — スキル存在確認 → use セッション開始 → 開始メッセージ（存在しない場合はスキル一覧表示）
+- `handleUseMessage` — スレッド内メッセージ → 会話履歴取得 → Claude API（Sonnet + web_fetch ツール）→ 回答
+
+### core/app.ts（実装済み）
+- `useSessionStore` を Ports に追加
+- `handleMention` に `use` コマンドと `list` コマンドのルーティング追加
+- `handleThreadMessage` で use_sessions → train_sessions の順にチェックして分岐
+
+### core/train.ts（実装済み）
+- 育成用システムプロンプトを改善（Slack ボットとしての口調、内部形式の用語を避ける）
 
 ---
 
 ## 実装ステップ
 
-### Step 1: セッションのリネームと UseSessionStore 追加
+### Step 1: セッションのリネームと UseSessionStore 追加（完了）
 - 既存 SessionStore の KV キーを `["train_sessions", ...]` にリネーム
 - `UseSessionStore` インターフェース + `DenoKvUseSessionStore` を追加
 - `createApp` の ports に `useSessionStore` を追加
-- 既存の動作が壊れないことを確認
 
-### Step 2: use コマンドの基本フロー
+### Step 2: use コマンドの基本フロー（完了）
 - `core/use.ts` 新規作成
 - `handleUseStart` — スキル存在確認 → use セッション開始 → 開始メッセージ
-- `app.ts` に use コマンドのルーティング追加
+- `app.ts` に use コマンドと list コマンドのルーティング追加
 
-### Step 3: スレッド内会話
+### Step 3: スレッド内会話 + ツール対応（完了）
 - Messenger に `getThreadReplies` 追加（`conversations.replies`）
-- `handleUseMessage` — 会話履歴取得（startTs 以降 + メンション除外）→ Claude API → 回答
+- `handleUseMessage` — 会話履歴取得（startTs 以降 + メンション除外）→ Claude API（Sonnet）→ 回答
 - `app.ts` の `handleThreadMessage` で use_sessions → train_sessions の順に分岐
+- `Llm.chat` に `model` と `tools` パラメータ追加
+- `web_fetch` ツール実装（HTML取得 → テキスト化 → Claude に返す → ループ）
+- use 用システムプロンプトにツールの使い方を記載
 
-### Step 4: スレッド内でのモード切り替え
+### Step 4: スレッド内でのモード切り替え（未実装）
 - `handleUseInThread` — 同じスキル（すでにモード）/ 別のスキル（上書き）/ train からの切り替え
 - train コマンド実行時に use_sessions を消す処理を train.ts に追加
 - use → train → use の交互切り替えが正しく動くことを確認

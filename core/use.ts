@@ -2,10 +2,26 @@ import type {
   KeyVault,
   Llm,
   LlmMessage,
+  LlmTool,
   Messenger,
   SkillStore,
   UseSessionStore,
 } from "./ports.ts";
+
+/** use モードで Claude に与えるツール */
+const USE_TOOLS: LlmTool[] = [
+  {
+    name: "web_fetch",
+    description: "指定したURLのウェブページを取得します。ウェブ検索、クローリング、ページ内容の取得に使ってください。検索したい場合は Google 等の検索URLを指定できます。",
+    input_schema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "取得するURL" },
+      },
+      required: ["url"],
+    },
+  },
+];
 
 export async function handleUseStart(
   messenger: Messenger,
@@ -35,6 +51,12 @@ function buildUseSystemPrompt(skillContent: string): string {
 スキルに記載されたルール・知識・方針に従い、ユーザーの質問や依頼に対応してください。
 あなたは Claude です。Claude としての能力はすべて使えます。
 返答は Slack のスレッドに投稿されるため、簡潔にしてください。
+
+## ツールの使い方
+web_fetch ツールでウェブページを取得できます。
+- 検索したい場合: https://www.google.com/search?q=キーワード を取得して検索結果を得る
+- 特定サイトを見たい場合: URLを直接指定して取得する
+- 複数ページをクロールしたい場合: 取得結果からリンクを拾って順に取得する
 
 ## スキル
 ${skillContent}`;
@@ -74,8 +96,6 @@ export async function handleUseMessage(
     if (reply.ts <= session.startTs) continue;
     // メンション（コマンド）は会話履歴に含めない
     if (/<@[A-Z0-9]+>/.test(reply.text)) continue;
-    // 今回のメッセージは最後に user として追加するので除外
-    if (reply.ts === text) continue;
 
     messages.push({
       role: reply.botId ? "assistant" : "user",
@@ -83,14 +103,17 @@ export async function handleUseMessage(
     });
   }
 
-  // 今回のメッセージを追加
-  messages.push({ role: "user", content: text });
+  // 履歴に今回のメッセージが含まれていない場合（タイミングの問題）に追加
+  const last = messages[messages.length - 1];
+  if (!last || last.role !== "user" || last.content !== text) {
+    messages.push({ role: "user", content: text });
+  }
 
   const systemPrompt = buildUseSystemPrompt(skillContent);
 
   let response: string;
   try {
-    response = await llm.chat(apiKey, messages, systemPrompt, "claude-sonnet-4-6");
+    response = await llm.chat(apiKey, messages, systemPrompt, "claude-sonnet-4-6", USE_TOOLS);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     await messenger.replyInThread(channel, threadTs, `エラーが発生しました: ${message}`);

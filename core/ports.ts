@@ -41,6 +41,9 @@ export interface KvBrowser {
 // Port: LLM（バリデーション・チャット）
 export type LlmMessage = { role: "user" | "assistant"; content: string };
 
+// deno-lint-ignore no-explicit-any
+export type LlmTool = { name: string; description: string; input_schema: any };
+
 export interface Llm {
   validate(apiKey: string): Promise<boolean>;
   chat(
@@ -48,6 +51,7 @@ export interface Llm {
     messages: LlmMessage[],
     systemPrompt: string,
     model?: string,
+    tools?: LlmTool[],
   ): Promise<string>;
 }
 

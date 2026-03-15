@@ -46,6 +46,14 @@
 - **全角スペース対応**（`parseCommand` で全角→半角変換）
 - **メンション二重処理の修正** — `parseSlackEvent` でメンション含むメッセージを `thread_message` から除外
 - **OK/NG ボタン差し替え** — 押下後に `chat.update` でボタンを結果テキストに差し替え（`Messenger.updateMessage` 追加）
+- **育成プロンプト改善** — Slack ボットとしての口調指示、YAML/markdown 等の内部用語を避ける
+- **実行モード（use コマンド）**（設計: `docs/use.md`、Step 4 のモード切り替えは未実装）
+  - `use スキル名` で Sonnet ベースの会話セッション開始
+  - train/use セッションを KV キーで分離（`train_sessions` / `use_sessions`）
+  - `conversations.replies` でスレッド履歴取得、`startTs` 以降のみ使用
+  - `Llm.chat` に `model` / `tools` パラメータ追加（train は Haiku、use は Sonnet）
+  - `web_fetch` ツール対応（Claude が tool use でウェブページ取得可能、最大5回ループ）
+- **list コマンド** — `@SkillBot list` でスキル一覧表示
 
 ### Slack 側の設定状況
 - Event Subscriptions: `app_mention` + `message.channels` + `message.groups`（プライベートチャンネル用）設定済み
@@ -57,7 +65,6 @@
 
 ## 未着手だが設計済み
 - テスト戦略（`docs/testing.md`）— ユニットテスト + リグレッションチェックリスト + CI/CD
-- 実行モード（`@SkillBot use スキル名`）
-- スキル一覧（`@SkillBot list`）
+- use モードの Step 4: スレッド内モード切り替え（`docs/use.md` 参照）
 - Canvas 対応（SkillStore の adapter 差し替え）
 - 画像対応（Post-MVP）
