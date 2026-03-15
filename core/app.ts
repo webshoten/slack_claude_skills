@@ -96,6 +96,10 @@ export function createApp(ports: Ports) {
           }
           return;
         }
+        // スレッド内で train → use セッションを削除
+        if (threadTs) {
+          await useSessionStore.end(threadTs);
+        }
         // スレッド内からのメンションかどうか
         if (threadTs) {
           await train.handleTrainInThread(
