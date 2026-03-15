@@ -367,3 +367,5 @@ JSON形式で出力。説明や前置きは不要。
 ### その他の改善（完了）
 - 全角スペース対応（parseCommand で全角→半角変換）
 - buildTrainGuide 簡素化（「育成セッションを開始します」に統一）
+- `parseSlackEvent` でメンション含むメッセージを `thread_message` から除外（show 等のコマンドが育成入力として二重処理される問題の修正）
+- OK/NG ボタン押下後に `chat.update` でボタンを結果テキストに差し替え（Messenger に `updateMessage` 追加）

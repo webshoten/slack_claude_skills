@@ -44,6 +44,8 @@
   - `show スキル名` — 指定スキルの SKILL.md を表示（チャンネル / スレッド）
   - `show`（スキル名省略）— スレッド内ではセッションのスキルを表示
 - **全角スペース対応**（`parseCommand` で全角→半角変換）
+- **メンション二重処理の修正** — `parseSlackEvent` でメンション含むメッセージを `thread_message` から除外
+- **OK/NG ボタン差し替え** — 押下後に `chat.update` でボタンを結果テキストに差し替え（`Messenger.updateMessage` 追加）
 
 ### Slack 側の設定状況
 - Event Subscriptions: `app_mention` + `message.channels` + `message.groups`（プライベートチャンネル用）設定済み
