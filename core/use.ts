@@ -115,9 +115,9 @@ export async function handleUseMessage(
     messages.push({ role: "user", content: text });
   }
 
-  // レートリミット対策: 直近50件に制限（最後のメッセージは必ず含む）
-  if (messages.length > 50) {
-    messages.splice(0, messages.length - 50);
+  // レートリミット対策: 直近20件に制限（最後のメッセージは必ず含む）
+  if (messages.length > 20) {
+    messages.splice(0, messages.length - 20);
   }
 
   const systemPrompt = buildUseSystemPrompt(skillContent);
