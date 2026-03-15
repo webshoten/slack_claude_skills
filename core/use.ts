@@ -99,6 +99,8 @@ export async function handleUseMessage(
     if (reply.ts <= session.startTs) continue;
     // メンション（コマンド）は会話履歴に含めない
     if (/<@[A-Z0-9]+>/.test(reply.text)) continue;
+    // ボットのコマンド応答（show出力、モード開始メッセージ等）は会話履歴に含めない
+    if (reply.botId && /モードで会話を開始します|の現在のスキル:\n---/.test(reply.text)) continue;
 
     messages.push({
       role: reply.botId ? "assistant" : "user",
@@ -110,6 +112,11 @@ export async function handleUseMessage(
   const last = messages[messages.length - 1];
   if (!last || last.role !== "user" || last.content !== text) {
     messages.push({ role: "user", content: text });
+  }
+
+  // レートリミット対策: 直近50件に制限（最後のメッセージは必ず含む）
+  if (messages.length > 50) {
+    messages.splice(0, messages.length - 50);
   }
 
   const systemPrompt = buildUseSystemPrompt(skillContent);

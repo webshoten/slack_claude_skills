@@ -118,7 +118,18 @@ conversations.replies で全メッセージ取得
   → LlmMessage[] に変換
 ```
 
-- KV に会話履歴を保存する方式もあるが、Slack が履歴を持っているので二重管理になる
+> **⚠️ 重要: 会話履歴は Slack スレッドの返信から毎回取得する**
+>
+> use モードの会話履歴は **KV には保存せず、毎回 Slack API から取得する**。
+> つまりユーザーが発言するたびに、スレッド内の全返信を取得し直して Claude API に送る。
+>
+> これは以下の理由による:
+> - Slack が正（single source of truth）— KV に二重保存すると整合性の問題が生じる
+> - Slack の返信には bot_id 等のメタ情報があり、role の判定が容易
+>
+> **トークン数への影響**: スレッドが長くなると入力トークンが増大するため、
+> **直近20件に制限**している（`use.ts`）。レートリミット（30,000 input tokens/min）対策。
+
 - Bot Token Scopes に `channels:history` / `groups:history` は設定済み
 
 ---
