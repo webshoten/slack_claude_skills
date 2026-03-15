@@ -10,6 +10,7 @@ import { DenoKvVault } from "./adapters/kv/vault.ts";
 import { DenoKvSkillStore } from "./adapters/kv/skill-store.ts";
 import { DenoKvSessionStore } from "./adapters/kv/session-store.ts";
 import { DenoKvPendingStore } from "./adapters/kv/pending-store.ts";
+import { DenoKvUseSessionStore } from "./adapters/kv/use-session-store.ts";
 import { createAdmin } from "./adapters/kv/admin.ts";
 import { DenoKvBrowser } from "./adapters/kv/browser.ts";
 import { ClaudeLlm } from "./adapters/llm/claude.ts";
@@ -21,6 +22,7 @@ const skillBot = createApp({
   keyVault: await DenoKvVault.create(Deno.env.get("ENCRYPTION_KEY") ?? ""),
   skillStore: new DenoKvSkillStore(),
   sessionStore: new DenoKvSessionStore(),
+  useSessionStore: new DenoKvUseSessionStore(),
   pendingStore: new DenoKvPendingStore(),
   llm: new ClaudeLlm(),
 });

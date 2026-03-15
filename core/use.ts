@@ -14,7 +14,11 @@ export async function handleUseStart(
 ): Promise<void> {
   const content = await skillStore.get(skillName);
   if (!content) {
-    await messenger.reply(channel, `*${skillName}* はまだ作成されていません。`, ts);
+    const skills = await skillStore.list();
+    const msg = skills.length > 0
+      ? `*${skillName}* はまだ作成されていません。\n\n利用可能なスキル:\n${skills.map((s) => `• ${s}`).join("\n")}`
+      : `*${skillName}* はまだ作成されていません。スキルが1つもありません。\`train スキル名\` で作成してください。`;
+    await messenger.reply(channel, msg, ts);
     return;
   }
 

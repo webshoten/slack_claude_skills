@@ -6,9 +6,11 @@ import type {
   PendingStore,
   SessionStore,
   SkillStore,
+  UseSessionStore,
 } from "./ports.ts";
 import * as apikey from "./apikey.ts";
 import * as train from "./train.ts";
+import * as use from "./use.ts";
 
 export type Ports = {
   messenger: Messenger;
@@ -16,6 +18,7 @@ export type Ports = {
   keyVault: KeyVault;
   skillStore: SkillStore;
   sessionStore: SessionStore;
+  useSessionStore: UseSessionStore;
   pendingStore: PendingStore;
   llm: Llm;
 };
@@ -27,8 +30,8 @@ function parseCommand(text: string): string {
 
 export function createApp(ports: Ports) {
   const {
-    messenger, messageStore, keyVault, skillStore, sessionStore, pendingStore,
-    llm,
+    messenger, messageStore, keyVault, skillStore, sessionStore, useSessionStore,
+    pendingStore, llm,
   } = ports;
 
   return {
@@ -131,7 +134,34 @@ export function createApp(ports: Ports) {
         return;
       }
 
-      // TODO: use, list の実装
+      // use コマンド
+      if (command === "use" || command.startsWith("use ")) {
+        const skillName = command.slice("use".length).trim();
+        if (!skillName) {
+          await messenger.reply(
+            channel,
+            "スキル名を指定してください。例: `use react-expert`",
+            threadTs ?? ts,
+          );
+          return;
+        }
+        await use.handleUseStart(
+          messenger, skillStore, useSessionStore,
+          channel, skillName, threadTs ?? ts,
+        );
+        return;
+      }
+
+      // list コマンド
+      if (command === "list") {
+        const skills = await skillStore.list();
+        const msg = skills.length > 0
+          ? `スキル一覧:\n${skills.map((s) => `• ${s}`).join("\n")}`
+          : "スキルはまだありません。`train スキル名` で作成してください。";
+        await messenger.reply(channel, msg, threadTs ?? ts);
+        return;
+      }
+
       await messenger.reply(channel, `受け取りました: ${text}`);
     },
 
