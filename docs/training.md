@@ -35,8 +35,8 @@ description: このスキルの説明（いつ・何に使うか）
 
 ```
 1. ユーザー: @SkillBot train react-expert
-2. Bot: スレッドを作成 → ガイドメッセージを投稿
-3. Bot: セッションを KV に記録（thread_ts → スキル名）
+2. Bot: ユーザーのメッセージにスレッド返信 → ガイドメッセージを投稿
+3. Bot: セッションを KV に記録（ユーザーのメッセージの ts → スキル名）
 4. ユーザー: （スレッド内で）コンポーネントはAtomic Designで設計する
 5. Bot: Claude API でユーザー入力を SKILL.md 形式に整形
 6. Bot: 「以下をスキルに追加しますか？
@@ -60,7 +60,7 @@ react-expert を新規作成します。
 
 ```
 1. ユーザー: @SkillBot train react-expert
-2. Bot: スレッドを作成 → 現在の SKILL.md の内容を表示
+2. Bot: スレッド返信 → 現在の SKILL.md の内容を表示
 3. ユーザー: Atomic Designやめて、Feature-based構成にして
 4. Bot: Claude API が既存 SKILL.md と照合し、差分を提案
 5. Bot: 「以下の変更を行いますか？
@@ -84,6 +84,16 @@ react-expert の育成を再開します。
 追加・編集・削除したい内容を送ってください。
 ```
 
+### スレッド内での train コマンド
+
+| 状況 | 動作 |
+|------|------|
+| `train`（スキル名なし）+ セッションあり | 「現在 X を育成中です」 |
+| `train`（スキル名なし）+ セッションなし | 「スキル名を指定してください」 |
+| `train X`（同じスキル） | 「すでに X を育成中です」 |
+| `train Y`（別のスキル） | Y に切り替え + ガイドメッセージ |
+| `train X`（セッションなし） | 新規セッション開始 |
+
 ### 操作の種類
 
 ユーザーは自然言語でスレッドに書くだけ。Claude API が既存 SKILL.md と照らし合わせて判断する。
@@ -98,9 +108,44 @@ react-expert の育成を再開します。
 
 ---
 
+## アーキテクチャ
+
+### createApp パターン
+
+`core/app.ts` の `createApp(ports)` で全 Port を受け取り、クロージャで保持する。
+各ハンドラはイベント固有の引数だけで呼び出せる。
+
+```typescript
+const skillBot = createApp({
+  messenger, messageStore, keyVault, skillStore, sessionStore, llm,
+});
+
+// main.ts での呼び出し
+skillBot.handleMention(channel, user, text, ts, threadTs);
+skillBot.handleApiKeyButton(triggerId, channel);
+skillBot.handleApiKeySave(userId, channel, key);
+```
+
+### 責務分離
+
+| ファイル | 責務 |
+|---------|------|
+| `core/app.ts` | `createApp` + `handleMention`（コマンドの振り分け） |
+| `core/train.ts` | 育成ロジック（`handleTrainStart`, `handleTrainInThread`, `handleTrainStatus`） |
+| `core/apikey.ts` | APIキーロジック（`handleApiKeyButton`, `handleApiKeySave`） |
+| `core/ports.ts` | 全 Port インターフェース定義 |
+
+### セッション管理
+
+- セッションキー = ユーザーの `train` メッセージの `ts`（= スレッドの親メッセージ）
+- `startThread` は不要。既存の `reply(channel, text, ts)` でスレッド返信する
+- スレッド内の返信は `thread_ts` 付きイベントで受信 → セッションと紐付け
+
+---
+
 ## 必要な Port
 
-### SkillStore（新規）
+### SkillStore（実装済み）
 
 スキルは全員共有（userId なし）。
 
@@ -113,11 +158,21 @@ interface SkillStore {
 }
 ```
 
-- `get` で既存 SKILL.md を取得（Claude API のコンテキストに使う）
-- `save` で SKILL.md を丸ごと上書き保存（差分適用後の全体）
-- MVP では Deno KV に保存。Post-MVP で Slack Canvas に移行
+- MVP では Deno KV に保存（`["skills", name]`）。Post-MVP で Slack Canvas に移行
 
-### Llm（既存を拡張）
+### SessionStore（実装済み）
+
+```typescript
+interface SessionStore {
+  start(threadTs: string, skillName: string): Promise<void>;
+  get(threadTs: string): Promise<string | null>;
+  end(threadTs: string): Promise<void>;
+}
+```
+
+KV キー: `["sessions", threadTs]` → スキル名
+
+### Llm（chat 未実装）
 
 ```typescript
 interface Llm {
@@ -128,38 +183,26 @@ interface Llm {
 
 `chat` を追加。ユーザーの APIキーで Claude API を呼ぶ。
 
-### SessionStore（新規）
-
-育成セッションの状態を管理する。
+### Messenger（replyInThread 未実装）
 
 ```typescript
-interface SessionStore {
-  start(threadTs: string, skillName: string): Promise<void>;
-  get(threadTs: string): Promise<string | null>;  // スキル名を返す
-  end(threadTs: string): Promise<void>;
-}
-```
-
-KV キー: `["sessions", threadTs]` → スキル名
-
-### Messenger（既存を拡張）
-
-スレッド作成時に投稿の `ts` を返す必要がある（セッション管理に使う）。
-
-```typescript
-// 追加
-startThread(channel: string, text: string): Promise<string>;  // 戻り値は thread_ts
+// 既存
+reply(channel: string, text: string, threadTs?: string): Promise<void>;
+// 追加予定
 replyInThread(channel: string, threadTs: string, text: string, blocks?: unknown[]): Promise<void>;
 ```
 
-- `startThread`: チャンネルにメッセージを投稿し、Slack API レスポンスから `ts` を返す
-- `replyInThread`: OK/NG ボタン付きの返信など、スレッド内での投稿に使う
+`replyInThread`: OK/NG ボタン付きの返信など、blocks を含むスレッド内投稿に使う。
 
 ---
 
 ## イベント処理
 
-### 新しいイベントタイプ
+### app_mention（実装済み）
+
+`threadTs` を含むように拡張済み。スレッド内からのメンションかどうかを判定できる。
+
+### thread_message（未実装）
 
 `message.channels` イベントでスレッド内の返信を受信する。
 `parseSlackEvent` に追加:
@@ -171,7 +214,7 @@ replyInThread(channel: string, threadTs: string, text: string, blocks?: unknown[
 - `thread_ts` があり `bot_id` がない → ユーザーからのスレッド返信
 - Bot 自身のメッセージは無視する（無限ループ防止）
 
-### Interaction（OK/NG ボタン）
+### Interaction: OK/NG ボタン（未実装）
 
 `parseSlackInteraction` に追加:
 
@@ -186,24 +229,40 @@ replyInThread(channel: string, threadTs: string, text: string, blocks?: unknown[
 
 ## Core ロジック
 
-### handleTrainStart
+### handleTrainStart（実装済み）
 
 ```
 train コマンド受信
   → スキル名を取得
   → SkillStore.get(name) で既存スキルの有無を確認
-  → messenger.startThread() でチャンネルにメッセージを投稿（スレッドの親）
+  → messenger.reply(channel, message, ts) でスレッド返信
     - 新規: ガイドメッセージ
     - 既存: 現在の SKILL.md を表示
-  → 戻り値の ts を thread_ts として使用
   → SessionStore.start(ts, skillName) で KV に記録
-  → 以降、ユーザーがこのスレッドに返信すると thread_ts 付きイベントで受信
 ```
 
-### handleThreadMessage
+### handleTrainInThread（実装済み）
 
 ```
-スレッド内メッセージ受信
+スレッド内から train コマンド受信
+  → SessionStore.get(threadTs) でセッション確認
+  → 同じスキル → 「育成中です」
+  → 別のスキル → 切り替え + ガイドメッセージ
+  → セッションなし → 新規セッション開始
+```
+
+### handleTrainStatus（実装済み）
+
+```
+スレッド内で train（スキル名なし）
+  → セッションあり → 「現在 X を育成中です」
+  → セッションなし → 「スキル名を指定してください」
+```
+
+### handleThreadMessage（未実装）
+
+```
+スレッド内メッセージ受信（メンションなし）
   → SessionStore.get(threadTs) でセッション確認（なければ無視）
   → KeyVault.get(userId) で APIキーを取得（未登録なら設定を促す）
   → SkillStore.get(name) で既存 SKILL.md を取得
@@ -216,7 +275,7 @@ train コマンド受信
   → updated を一時的に KV に保存（ボタン押下時に使う）
 ```
 
-### handleTrainConfirm
+### handleTrainConfirm（未実装）
 
 ```
 OK/NG ボタン押下
@@ -266,13 +325,24 @@ OK/NG ボタン押下
 
 ---
 
-## 実装順
+## 実装ステップ
 
-1. `SkillStore` port + `DenoKvSkillStore` adapter
-2. `SessionStore` port + `DenoKvSessionStore` adapter
-3. `Messenger` port に `startThread` / `replyInThread` 追加 + `SlackMessenger` に実装
-4. `Llm` port に `chat` 追加 + `ClaudeLlm` に実装
-5. `parseSlackEvent` に `thread_message` 追加
-6. `parseSlackInteraction` に `train_confirm` 追加
-7. Core: `handleTrainStart`, `handleThreadMessage`, `handleTrainConfirm`
-8. `main.ts` にワイヤリング
+### Step 1: train コマンドでスレッド作成（完了）
+- SkillStore port + DenoKvSkillStore adapter
+- SessionStore port + DenoKvSessionStore adapter
+- parseSlackEvent に threadTs 追加
+- handleTrainStart, handleTrainInThread, handleTrainStatus
+- createApp パターンへのリファクタ
+- 責務分離（core/train.ts, core/apikey.ts）
+
+### Step 2: スレッド返信 → Claude 差分提案（次）
+- Llm port に chat 追加 + ClaudeLlm に実装
+- parseSlackEvent に thread_message 追加
+- Messenger に replyInThread 追加
+- PendingStore（一時データ保存）
+- Core: handleThreadMessage
+- Slack 側: Event Subscriptions に message.channels 追加
+
+### Step 3: OK/NG → 保存 or スキップ
+- parseSlackInteraction に train_confirm 追加
+- Core: handleTrainConfirm

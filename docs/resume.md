@@ -1,6 +1,6 @@
 # 次回やること
 
-## 現在の状態（2026-03-14 時点）
+## 現在の状態（2026-03-15 時点）
 
 ### 完了済み
 - Deno 2.7.5 + Hono デプロイ済み（https://slack-claud-55.deno.dev/）
@@ -18,43 +18,50 @@
 - ヘルプ表示 + APIキー設定状況（スレッドで返信）
 - VSCode デバッグ設定（launch.json）
 - Ports & Adapters アーキテクチャ全体
+- **`createApp(ports)` パターンでDI整理**（core/app.ts）
+- **責務分離**: core/train.ts（育成ロジック）、core/apikey.ts（APIキーロジック）
+- **育成モード Step 1: train コマンドでスレッド作成**
+  - SkillStore port + DenoKvSkillStore adapter（`["skills", name]`）
+  - SessionStore port + DenoKvSessionStore adapter（`["sessions", threadTs]`）
+  - `parseSlackEvent` に `threadTs` 追加（スレッド内メンション判定）
+  - `handleTrainStart` — ユーザーのメッセージにスレッド返信 + セッション開始
+  - `handleTrainInThread` — 同じスキル→育成中表示 / 別スキル→切り替え / セッションなし→新規開始
+  - `handleTrainStatus` — スレッド内で `train`（スキル名なし）→ 現在の育成状況表示
 
 ### Slack 側の設定状況
-- Event Subscriptions: 要確認（`app_mention` + `message.channels` が必要）
-- Interactivity: 要設定（`/webhook/slack/interaction`）
+- Event Subscriptions: `app_mention` 設定済み。`message.channels` は Step 2 で必要
+- Interactivity: `/webhook/slack/interaction` 設定済み
 - 環境変数: `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`, `ADMIN_PASSWORD`, `ENCRYPTION_KEY`
 
 ---
 
-## 次回: 育成モード（train）の実装
+## 次回: 育成モード Step 2 — スレッド返信 → Claude 差分提案
 
-設計は `docs/training.md` に完了済み。実装順:
-
-1. **`SkillStore` port + `DenoKvSkillStore` adapter**
-   - スキルは全員共有（userId なし）
-   - KV キー: `["skills", スキル名]` → SKILL.md 全体
-
-2. **`SessionStore` port + `DenoKvSessionStore` adapter**
-   - KV キー: `["sessions", threadTs]` → スキル名
-
-3. **`Messenger` port に `startThread` / `replyInThread` 追加**
-   - `startThread` は Slack API レスポンスから `ts` を返す（セッション管理に必要）
-
-4. **`Llm` port に `chat` 追加 + `ClaudeLlm` に実装**
+1. **`Llm` port に `chat` 追加 + `ClaudeLlm` に実装**
    - ユーザーの APIキーで Claude API を呼ぶ
 
-5. **`parseSlackEvent` に `thread_message` 追加**
+2. **`parseSlackEvent` に `thread_message` 追加**
    - `thread_ts` あり + `bot_id` なし → ユーザーからのスレッド返信
 
-6. **`parseSlackInteraction` に `train_confirm` 追加**
-   - OK/NG ボタン（`train_ok` / `train_ng`）
+3. **`Messenger` に `replyInThread` 追加**
+   - OK/NG ボタン付きのスレッド返信
 
-7. **Core ロジック**
-   - `handleTrainStart` — スレッド作成 + セッション開始
-   - `handleThreadMessage` — Claude API で整形 → OK/NG 確認
-   - `handleTrainConfirm` — OK で保存 / NG でスキップ
+4. **`PendingStore`（一時データ保存）**
+   - OK 待ちの更新後 SKILL.md を `["pending", threadTs]` に保存
 
-8. **`main.ts` にワイヤリング**
+5. **Core: `handleThreadMessage`**（core/train.ts に追加）
+   - セッション確認 → APIキー取得 → Claude API → diff + OK/NG ボタン表示
+
+6. **`main.ts` にワイヤリング**
+
+7. **Slack 側**: Event Subscriptions に `message.channels` 追加が必要
+
+---
+
+## 育成モード Step 3（その次）: OK/NG → 保存 or スキップ
+
+- `parseSlackInteraction` に `train_confirm` 追加
+- Core: `handleTrainConfirm`
 
 ---
 
