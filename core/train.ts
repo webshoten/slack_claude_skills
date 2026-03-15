@@ -221,9 +221,12 @@ export async function handleThreadMessage(
 
   console.log("Claude response:", response);
 
+  // Claude がコードブロックで囲む場合があるので除去
+  const jsonStr = response.replace(/^```(?:json)?\s*\n?/m, "").replace(/\n?```\s*$/m, "").trim();
+
   let parsed: { type: string; diff?: string; updated?: string; message?: string };
   try {
-    parsed = JSON.parse(response);
+    parsed = JSON.parse(jsonStr);
   } catch {
     await messenger.replyInThread(
       channel,
