@@ -55,6 +55,15 @@ export class ClaudeLlm implements Llm {
         body: JSON.stringify(body),
       });
 
+      if (res.status === 429) {
+        // レートリミット: retry-after ヘッダーまたは30秒待ってリトライ
+        const retryAfter = parseInt(res.headers.get("retry-after") ?? "30", 10);
+        console.log(`Rate limited, retrying after ${retryAfter}s...`);
+        await new Promise((r) => setTimeout(r, retryAfter * 1000));
+        i--; // ループカウントを戻してリトライ
+        continue;
+      }
+
       if (!res.ok) {
         const error = await res.text();
         throw new Error(`Claude API error: ${res.status} ${error}`);

@@ -99,8 +99,8 @@ export async function handleUseMessage(
     if (reply.ts <= session.startTs) continue;
     // メンション（コマンド）は会話履歴に含めない
     if (/<@[A-Z0-9]+>/.test(reply.text)) continue;
-    // ボットのコマンド応答（show出力、モード開始メッセージ等）は会話履歴に含めない
-    if (reply.botId && /モードで会話を開始します|の現在のスキル:\n---/.test(reply.text)) continue;
+    // ボットのコマンド応答（show出力、モード開始メッセージ、エラー等）は会話履歴に含めない
+    if (reply.botId && /モードで会話を開始します|の現在のスキル:\n---|^エラーが発生しました/.test(reply.text)) continue;
 
     messages.push({
       role: reply.botId ? "assistant" : "user",
