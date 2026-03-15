@@ -219,6 +219,8 @@ export async function handleThreadMessage(
     return;
   }
 
+  console.log("Claude response:", response);
+
   let parsed: { type: string; diff?: string; updated?: string; message?: string };
   try {
     parsed = JSON.parse(response);
