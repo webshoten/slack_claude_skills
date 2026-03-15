@@ -50,7 +50,7 @@ export async function handleTrainStatus(
   } else {
     await messenger.reply(
       channel,
-      "スキル名を指定してください。例: `train react-expert`",
+      "スキル名を指定してください。例: `@SlackBot train react-expert`",
       threadTs,
     );
   }
