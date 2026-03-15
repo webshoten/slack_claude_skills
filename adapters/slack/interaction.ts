@@ -1,7 +1,7 @@
 export type SlackInteraction =
   | { kind: "apikey_button"; triggerId: string; user: string; channel: string }
   | { kind: "apikey_submission"; user: string; channel: string; apiKey: string }
-  | { kind: "train_confirm"; approved: boolean; user: string; channel: string; threadTs: string }
+  | { kind: "train_confirm"; approved: boolean; user: string; channel: string; threadTs: string; messageTs: string }
   | { kind: "unknown" };
 
 // deno-lint-ignore no-explicit-any
@@ -23,6 +23,7 @@ export function parseSlackInteraction(payload: any): SlackInteraction {
         user: payload.user.id,
         channel: payload.channel?.id ?? "",
         threadTs: payload.message?.thread_ts ?? "",
+        messageTs: payload.message?.ts ?? "",
       };
     }
   }

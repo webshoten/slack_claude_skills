@@ -292,6 +292,7 @@ export async function handleTrainConfirm(
   pendingStore: PendingStore,
   channel: string,
   threadTs: string,
+  messageTs: string,
   approved: boolean,
 ): Promise<void> {
   if (approved) {
@@ -307,9 +308,17 @@ export async function handleTrainConfirm(
     }
     await skillStore.save(skillName, updated);
     await pendingStore.delete(threadTs);
+    // ボタンを結果に差し替え
+    if (messageTs) {
+      await messenger.updateMessage(channel, messageTs, "✅ 反映しました。");
+    }
     await messenger.replyInThread(channel, threadTs, "反映しました。");
   } else {
     await pendingStore.delete(threadTs);
+    // ボタンを結果に差し替え
+    if (messageTs) {
+      await messenger.updateMessage(channel, messageTs, "⏭️ スキップしました。");
+    }
     await messenger.replyInThread(channel, threadTs, "スキップしました。別の内容をどうぞ。");
   }
 }

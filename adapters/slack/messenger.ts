@@ -81,6 +81,10 @@ export class SlackMessenger implements Messenger {
     await this.slackApi("chat.postMessage", payload);
   }
 
+  async updateMessage(channel: string, ts: string, text: string): Promise<void> {
+    await this.slackApi("chat.update", { channel, ts, text, blocks: [] });
+  }
+
   private async slackApi(
     method: string,
     body: Record<string, unknown>,

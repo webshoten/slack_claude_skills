@@ -150,11 +150,12 @@ export function createApp(ports: Ports) {
     async handleTrainConfirm(
       channel: string,
       threadTs: string,
+      messageTs: string,
       approved: boolean,
     ): Promise<void> {
       await train.handleTrainConfirm(
         messenger, skillStore, sessionStore, pendingStore,
-        channel, threadTs, approved,
+        channel, threadTs, messageTs, approved,
       );
     },
 

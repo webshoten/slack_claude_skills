@@ -14,6 +14,8 @@ export interface Messenger {
     text: string,
     blocks?: unknown[],
   ): Promise<void>;
+  // 既存メッセージを更新（ボタン差し替え等）
+  updateMessage(channel: string, ts: string, text: string): Promise<void>;
 }
 
 // Port: メッセージの保存先を抽象化

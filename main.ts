@@ -102,6 +102,7 @@ server.post("/webhook/slack/interaction", verify, async (c) => {
     await skillBot.handleTrainConfirm(
       interaction.channel,
       interaction.threadTs,
+      interaction.messageTs,
       interaction.approved,
     );
     return c.json({ ok: true });
