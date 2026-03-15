@@ -34,6 +34,28 @@ function buildTrainGuide(
   ].join("\n");
 }
 
+export async function handleTrainStatus(
+  messenger: Messenger,
+  sessionStore: SessionStore,
+  channel: string,
+  threadTs: string,
+): Promise<void> {
+  const currentSkill = await sessionStore.get(threadTs);
+  if (currentSkill) {
+    await messenger.reply(
+      channel,
+      `現在 *${currentSkill}* を育成中です。`,
+      threadTs,
+    );
+  } else {
+    await messenger.reply(
+      channel,
+      "スキル名を指定してください。例: `train react-expert`",
+      threadTs,
+    );
+  }
+}
+
 export async function handleTrainStart(
   messenger: Messenger,
   skillStore: SkillStore,

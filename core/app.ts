@@ -75,11 +75,18 @@ export function createApp(ports: Ports) {
       if (command === "train" || command.startsWith("train ")) {
         const skillName = command.slice("train".length).trim();
         if (!skillName) {
-          await messenger.reply(
-            channel,
-            "スキル名を指定してください。例: `train react-expert`",
-            ts,
-          );
+          if (threadTs) {
+            await train.handleTrainStatus(
+              messenger, sessionStore,
+              channel, threadTs,
+            );
+          } else {
+            await messenger.reply(
+              channel,
+              "スキル名を指定してください。例: `train react-expert`",
+              ts,
+            );
+          }
           return;
         }
         // スレッド内からのメンションかどうか
