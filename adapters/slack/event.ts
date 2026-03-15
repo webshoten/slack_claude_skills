@@ -40,11 +40,14 @@ export function parseSlackEvent(
 
     // スレッド内のメッセージ（メンションなし）
     // bot_id があれば Bot 自身の投稿なので無視（無限ループ防止）
+    // メンションを含むメッセージは app_mention で処理済みなので除外
+    // （除外しないと show 等のコマンドが育成入力としても二重処理される）
     if (
       event.type === "message" &&
       !event.subtype &&
       event.thread_ts &&
-      !event.bot_id
+      !event.bot_id &&
+      !/<@[A-Z0-9]+>/.test(event.text)
     ) {
       return {
         kind: "thread_message",

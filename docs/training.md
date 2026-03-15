@@ -351,8 +351,19 @@ JSON形式で出力。説明や前置きは不要。
 - PendingStore port + DenoKvPendingStore adapter
 - Core: handleThreadMessage
 - Claude レスポンスの分岐: proposal（提案 + OK/NG）/ question（質問のみ）
-- Slack 側: Event Subscriptions に message.channels 設定済み
+- コードブロック記法（` ```json ``` `）の除去処理
+- Slack リトライの無視（`x-slack-retry-num` ヘッダー判定）
+- Slack 側: Event Subscriptions に `message.channels` + `message.groups` 設定済み
 
-### Step 3: OK/NG → 保存 or スキップ
-- parseSlackInteraction に train_confirm 追加
-- Core: handleTrainConfirm
+### Step 3: OK/NG → 保存 or スキップ（完了）
+- parseSlackInteraction に train_confirm 追加（`train_ok` / `train_ng`）
+- Core: handleTrainConfirm — OK → pending → skillStore 保存 / NG → pending 破棄
+
+### show コマンド（完了）
+- `show スキル名` — 指定スキルの SKILL.md を表示（チャンネル / スレッド）
+- `show`（スキル名省略）— スレッド内ではセッションのスキルを表示
+- Core: handleShowSkill
+
+### その他の改善（完了）
+- 全角スペース対応（parseCommand で全角→半角変換）
+- buildTrainGuide 簡素化（「育成セッションを開始します」に統一）

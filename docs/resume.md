@@ -34,6 +34,16 @@
   - PendingStore port + DenoKvPendingStore adapter（`["pending", threadTs]`）
   - `handleThreadMessage` — セッション確認 → Claude API → diff + OK/NG ボタン表示 → pending 保存
   - 育成用システムプロンプト（`buildTrainSystemPrompt`）
+  - Claude レスポンスの `proposal`/`question` 分岐
+  - コードブロック記法（` ```json ``` `）の除去処理
+  - Slack リトライの無視（`x-slack-retry-num` ヘッダー判定）
+- **育成モード Step 3: OK/NG → 保存 or スキップ**
+  - `parseSlackInteraction` に `train_confirm` 追加（`train_ok` / `train_ng`）
+  - `handleTrainConfirm` — OK → pending から取り出して skillStore に保存 / NG → pending 破棄
+- **show コマンド**
+  - `show スキル名` — 指定スキルの SKILL.md を表示（チャンネル / スレッド）
+  - `show`（スキル名省略）— スレッド内ではセッションのスキルを表示
+- **全角スペース対応**（`parseCommand` で全角→半角変換）
 
 ### Slack 側の設定状況
 - Event Subscriptions: `app_mention` + `message.channels` + `message.groups`（プライベートチャンネル用）設定済み
@@ -43,22 +53,9 @@
 
 ---
 
-## 次回: 育成モード Step 3 — OK/NG → 保存 or スキップ
-
-1. **`parseSlackInteraction` に `train_confirm` 追加**
-   - `action_id: "train_ok"` → approved: true
-   - `action_id: "train_ng"` → approved: false
-
-2. **Core: `handleTrainConfirm`**（core/train.ts に追加）
-   - OK → `pendingStore.get(threadTs)` → `skillStore.save()` → 「反映しました」
-   - NG → `pendingStore.delete(threadTs)` → 「スキップしました」
-
-3. **`main.ts` にワイヤリング**
-
----
-
 ## 未着手だが設計済み
 - テスト戦略（`docs/testing.md`）— ユニットテスト + リグレッションチェックリスト + CI/CD
 - 実行モード（`@SkillBot use スキル名`）
 - スキル一覧（`@SkillBot list`）
+- Canvas 対応（SkillStore の adapter 差し替え）
 - 画像対応（Post-MVP）
