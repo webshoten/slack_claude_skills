@@ -43,6 +43,14 @@ server.post("/webhook/slack", verify, async (c) => {
   const body = JSON.parse(c.get("slackRawBody"));
   console.log("POST /webhook/slack body:", JSON.stringify(body));
 
+  // Claude API の応答に時間がかかるとSlackがタイムアウトと判断してリトライする。
+  // リトライは重複処理になるので無視する。
+  const retryNum = c.req.header("x-slack-retry-num");
+  if (retryNum) {
+    console.log(`Slack retry #${retryNum} ignored`);
+    return c.json({ ok: true });
+  }
+
   const event = parseSlackEvent(body);
 
   if (event.kind === "challenge") {
