@@ -31,3 +31,18 @@ export interface KeyVault {
   save(userId: string, key: string): Promise<void>;
   delete(userId: string): Promise<void>;
 }
+
+// Port: スキル（SKILL.md）の保存
+export interface SkillStore {
+  get(name: string): Promise<string | null>;
+  save(name: string, content: string): Promise<void>;
+  list(): Promise<string[]>;
+  delete(name: string): Promise<void>;
+}
+
+// Port: 育成セッションの管理
+export interface SessionStore {
+  start(threadTs: string, skillName: string): Promise<void>;
+  get(threadTs: string): Promise<string | null>;
+  end(threadTs: string): Promise<void>;
+}

@@ -7,25 +7,28 @@ import { parseSlackInteraction } from "./adapters/slack/interaction.ts";
 import { slackVerifyMiddleware } from "./adapters/slack/verify.ts";
 import { DenoKvMessageStore } from "./adapters/kv/message-store.ts";
 import { DenoKvVault } from "./adapters/kv/vault.ts";
-import {
-  handleApiKeyButton,
-  handleApiKeySave,
-  handleMention,
-} from "./core/app.ts";
+import { DenoKvSkillStore } from "./adapters/kv/skill-store.ts";
+import { DenoKvSessionStore } from "./adapters/kv/session-store.ts";
 import { createAdmin } from "./adapters/kv/admin.ts";
 import { DenoKvBrowser } from "./adapters/kv/browser.ts";
 import { ClaudeLlm } from "./adapters/llm/claude.ts";
+import { createApp } from "./core/app.ts";
 
-const messenger = new SlackMessenger(Deno.env.get("SLACK_BOT_TOKEN") ?? "");
-const store = new DenoKvMessageStore();
-const vault = await DenoKvVault.create(Deno.env.get("ENCRYPTION_KEY") ?? "");
-const llm = new ClaudeLlm();
-const app = new Hono<SlackEnv>();
+const skillBot = createApp({
+  messenger: new SlackMessenger(Deno.env.get("SLACK_BOT_TOKEN") ?? ""),
+  messageStore: new DenoKvMessageStore(),
+  keyVault: await DenoKvVault.create(Deno.env.get("ENCRYPTION_KEY") ?? ""),
+  skillStore: new DenoKvSkillStore(),
+  sessionStore: new DenoKvSessionStore(),
+  llm: new ClaudeLlm(),
+});
+
+const server = new Hono<SlackEnv>();
 
 const browser = new DenoKvBrowser();
-app.route("/admin", createAdmin(browser));
+server.route("/admin", createAdmin(browser));
 
-app.get("/", (c) => {
+server.get("/", (c) => {
   return c.json({ message: "Hello Skill Bot!" });
 });
 
@@ -34,7 +37,7 @@ const verify = slackVerifyMiddleware(
 );
 
 // Slack イベント（メンション等）
-app.post("/webhook/slack", verify, async (c) => {
+server.post("/webhook/slack", verify, async (c) => {
   const body = JSON.parse(c.get("slackRawBody"));
   console.log("POST /webhook/slack body:", JSON.stringify(body));
 
@@ -44,16 +47,13 @@ app.post("/webhook/slack", verify, async (c) => {
     return c.json({ challenge: event.challenge });
   }
 
-  // @SkillBot とメンションされたときの処理
   if (event.kind === "mention") {
-    await handleMention(
-      messenger,
-      store,
-      vault,
+    await skillBot.handleMention(
       event.channel,
       event.user,
       event.text,
       event.ts,
+      event.threadTs,
     );
   }
 
@@ -61,7 +61,7 @@ app.post("/webhook/slack", verify, async (c) => {
 });
 
 // Slack Interactivity（ボタン押下・Modal送信）
-app.post("/webhook/slack/interaction", verify, async (c) => {
+server.post("/webhook/slack/interaction", verify, async (c) => {
   const raw = c.get("slackRawBody");
   const params = new URLSearchParams(raw);
   const payload = JSON.parse(params.get("payload") ?? "{}");
@@ -69,22 +69,16 @@ app.post("/webhook/slack/interaction", verify, async (c) => {
 
   const interaction = parseSlackInteraction(payload);
 
-  // APIキーを設定するボタンが押されたときの処理
   if (interaction.kind === "apikey_button") {
-    await handleApiKeyButton(
-      messenger,
+    await skillBot.handleApiKeyButton(
       interaction.triggerId,
       interaction.channel,
     );
     return c.json({ ok: true });
   }
 
-  // APIキーが入力されたときの処理
   if (interaction.kind === "apikey_submission") {
-    await handleApiKeySave(
-      vault,
-      llm,
-      messenger,
+    await skillBot.handleApiKeySave(
       interaction.user,
       interaction.channel,
       interaction.apiKey,
@@ -95,4 +89,4 @@ app.post("/webhook/slack/interaction", verify, async (c) => {
   return c.json({ ok: true });
 });
 
-Deno.serve(app.fetch);
+Deno.serve(server.fetch);

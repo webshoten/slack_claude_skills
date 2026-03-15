@@ -1,82 +1,134 @@
-import type { KeyVault, Llm, MessageStore, Messenger } from "./ports.ts";
+import type {
+  KeyVault,
+  Llm,
+  MessageStore,
+  Messenger,
+  SessionStore,
+  SkillStore,
+} from "./ports.ts";
+import * as apikey from "./apikey.ts";
+import * as train from "./train.ts";
+
+export type Ports = {
+  messenger: Messenger;
+  messageStore: MessageStore;
+  keyVault: KeyVault;
+  skillStore: SkillStore;
+  sessionStore: SessionStore;
+  llm: Llm;
+};
 
 /** メンションのテキストからBot名部分を除去してコマンドを取り出す */
 function parseCommand(text: string): string {
   return text.replace(/<@[A-Z0-9]+>/g, "").trim();
 }
 
-export async function handleMention(
-  messenger: Messenger,
-  store: MessageStore,
-  vault: KeyVault,
-  channel: string,
-  user: string,
-  text: string,
-  ts: string,
-): Promise<void> {
-  await store.save(channel, user, text, ts);
+export function createApp(ports: Ports) {
+  const { messenger, messageStore, keyVault, skillStore, sessionStore, llm } =
+    ports;
 
-  const command = parseCommand(text);
+  return {
+    async handleMention(
+      channel: string,
+      user: string,
+      text: string,
+      ts: string,
+      threadTs?: string,
+    ): Promise<void> {
+      await messageStore.save(channel, user, text, ts);
 
-  if (command === "set-key") {
-    await messenger.promptApiKeySetup(channel, user, ts);
-    return;
-  }
+      const command = parseCommand(text);
 
-  // set-key 以外はすべて APIキー必須
-  const apiKey = await vault.get(user);
+      if (command === "set-key") {
+        await messenger.promptApiKeySetup(channel, user, ts);
+        return;
+      }
 
-  // コマンドなし → ヘルプ表示
-  if (command === "") {
-    const keyStatus = apiKey
-      ? `設定済み（...${apiKey.slice(-4)}）`
-      : "未設定";
-    const help = [
-      `APIキー: ${keyStatus}`,
-      "",
-      "コマンド:",
-      "• set-key — Claude APIキー登録",
-      "• train スキル名 — スキル育成",
-      "• use スキル名 — スキル実行",
-      "• list — スキル一覧",
-    ].join("\n");
-    await messenger.reply(channel, help, ts);
-    return;
-  }
+      // set-key 以外はすべて APIキー必須
+      const apiKey = await keyVault.get(user);
 
-  // APIキー未登録なら設定を促す
-  if (!apiKey) {
-    await messenger.promptApiKeySetup(channel, user, ts);
-    return;
-  }
+      // コマンドなし → ヘルプ表示
+      if (command === "") {
+        const keyStatus = apiKey
+          ? `設定済み（...${apiKey.slice(-4)}）`
+          : "未設定";
+        const help = [
+          `APIキー: ${keyStatus}`,
+          "",
+          "コマンド:",
+          "• set-key — Claude APIキー登録",
+          "• train スキル名 — スキル育成",
+          "• use スキル名 — スキル実行",
+          "• list — スキル一覧",
+        ].join("\n");
+        await messenger.reply(channel, help, ts);
+        return;
+      }
 
-  // TODO: train, use, list の実装
-  await messenger.reply(channel, `受け取りました: ${text}`);
-}
+      // APIキー未登録なら設定を促す
+      if (!apiKey) {
+        await messenger.promptApiKeySetup(channel, user, ts);
+        return;
+      }
 
-export async function handleApiKeyButton(
-  messenger: Messenger,
-  triggerId: string,
-  channel: string,
-): Promise<void> {
-  await messenger.openApiKeyForm(triggerId, channel);
-}
+      // train コマンド
+      if (command.startsWith("train ")) {
+        const skillName = command.slice("train ".length).trim();
+        if (!skillName) {
+          await messenger.reply(
+            channel,
+            "スキル名を指定してください。例: `train react-expert`",
+            ts,
+          );
+          return;
+        }
+        // スレッド内からのメンションかどうか
+        if (threadTs) {
+          await train.handleTrainInThread(
+            messenger,
+            skillStore,
+            sessionStore,
+            channel,
+            skillName,
+            threadTs,
+          );
+        } else {
+          await train.handleTrainStart(
+            messenger,
+            skillStore,
+            sessionStore,
+            channel,
+            skillName,
+            ts,
+          );
+        }
+        return;
+      }
 
-export async function handleApiKeySave(
-  vault: KeyVault,
-  llm: Llm,
-  messenger: Messenger,
-  userId: string,
-  channel: string,
-  apiKey: string,
-): Promise<void> {
-  const valid = await llm.validate(apiKey);
-  if (!valid) {
-    await messenger.replyEphemeral(channel, userId, "無効なAPIキーです。確認して再度お試しください。");
-    return;
-  }
+      // TODO: use, list の実装
+      await messenger.reply(channel, `受け取りました: ${text}`);
+    },
 
-  await vault.save(userId, apiKey);
-  const masked = "..." + apiKey.slice(-4);
-  await messenger.replyEphemeral(channel, userId, `APIキーを設定しました（${masked}）`);
+    async handleApiKeyButton(
+      triggerId: string,
+      channel: string,
+    ): Promise<void> {
+      await apikey.handleApiKeyButton(messenger, triggerId, channel);
+    },
+
+    async handleApiKeySave(
+      userId: string,
+      channel: string,
+      key: string,
+    ): Promise<void> {
+      await apikey.handleApiKeySave(
+        messenger,
+        keyVault,
+        llm,
+        userId,
+        channel,
+        key,
+      );
+    },
+  };
 }
