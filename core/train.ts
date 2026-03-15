@@ -1,6 +1,7 @@
 import type {
   KeyVault,
   Llm,
+  LlmMessage,
   Messenger,
   PendingStore,
   SessionStore,
@@ -239,11 +240,37 @@ export async function handleThreadMessage(
   const existing = await skillStore.get(skillName);
   const systemPrompt = buildTrainSystemPrompt(skillName, existing);
 
+  // スレッドの会話履歴を取得（直近20件）
+  const replies = await messenger.getThreadReplies(channel, threadTs);
+  const messages: LlmMessage[] = [];
+  for (const reply of replies) {
+    // メンション（コマンド）は除外
+    if (/<@[A-Z0-9]+>/.test(reply.text)) continue;
+    // ボットのコマンド応答は除外
+    if (reply.botId && /モードで会話を開始します|の現在のスキル:\n---|^エラーが発生しました|育成モードに切り替えました/.test(reply.text)) continue;
+
+    messages.push({
+      role: reply.botId ? "assistant" : "user",
+      content: reply.text,
+    });
+  }
+
+  // 履歴に今回のメッセージが含まれていない場合に追加
+  const last = messages[messages.length - 1];
+  if (!last || last.role !== "user" || last.content !== text) {
+    messages.push({ role: "user", content: text });
+  }
+
+  // 直近20件に制限
+  if (messages.length > 20) {
+    messages.splice(0, messages.length - 20);
+  }
+
   let response: string;
   try {
     response = await llm.chat(
       apiKey,
-      [{ role: "user", content: text }],
+      messages,
       systemPrompt,
     );
   } catch (e) {
